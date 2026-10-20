@@ -7,7 +7,9 @@ export interface Scope {
 }
 
 const KEY = 'scope'
-const DEFAULT: Scope = { state: 'A', district: '' }
+// The focus area (plan A2): Perak › Perak Tengah, where UTP Seri Iskandar is. District IDs are stable uuid5s.
+const PERAK_TENGAH = 'fb490628-e926-5cdd-a695-047e862a4bc0'
+const DEFAULT: Scope = { state: 'A', district: PERAK_TENGAH }
 
 function load(): Scope {
   try {

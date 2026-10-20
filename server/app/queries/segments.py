@@ -6,7 +6,10 @@ from app.core import db
 from app.core.errors import ApiError
 
 MAX_ROAD_DISTANCE_M = 50
-NOT_ON_ROAD = "No mapped road within 50 m. Reporting covers all roads in Kinta and KL, main roads elsewhere."
+NOT_ON_ROAD = (
+    "No mapped road within 50 m. Reporting covers all roads around Seri Iskandar, in Kinta and in KL, "
+    "and main roads elsewhere."
+)
 
 # One segment with everything a drawer or a report needs: names of its owner and maintainer,
 # its district and state. Joined once here so every endpoint returns the same shape.

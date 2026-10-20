@@ -6,7 +6,8 @@ import psycopg
 
 from app.core.config import get_settings
 
-PILOT_DISTRICTS = (("A", "Kinta"), ("KUL", "Kuala Lumpur"))
+# road_segments.pilot (plan D13): UTP is the focus area, Kinta and KL are secondary.
+PILOTS = ("UTP", "KINTA", "KL")
 
 
 def connect() -> psycopg.Connection:
@@ -29,9 +30,11 @@ def pilot_segments(conn: psycopg.Connection) -> pd.DataFrame:
         """
         select s.id, s.road_class, s.name, s.ref, s.length_m::float as length_m, s.adt, s.heavy_pct::float as heavy_pct,
                s.karst, s.ex_mining, coalesce(s.tree_cover, 0)::float as tree_cover, s.criticality::float as criticality,
-               s.cell_id, s.osm_highway, s.surface, coalesce(s.lanes, 0) as lanes, d.name as district, s.state_code
+               s.cell_id, s.osm_highway, s.surface, coalesce(s.lanes, 0) as lanes, d.name as district, s.state_code,
+               s.pilot, ST_Distance(s.geom::geography, ST_SetSRID(ST_MakePoint(100.9704, 4.3826), 4326)::geography)
+                 as utp_m
         from road_segments s join districts d on d.id = s.district_id
-        where (d.state_code, d.name) in (('A', 'Kinta'), ('KUL', 'Kuala Lumpur'))""",
+        where s.pilot is not null""",
     )
 
 

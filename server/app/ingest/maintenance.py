@@ -16,6 +16,7 @@ from app.services import storage, usage
 
 TOMTOM_FLOW = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
 TOP_SEGMENTS = 50  # FR-ING-04: about 1,200 of TomTom's 2,500 free calls a day when run hourly
+TOP_UTP_SEGMENTS = 20  # plan A2: plus the focus area, about 1,680 calls a day in all
 SNAPSHOT_RETENTION_DAYS = 90  # plan §6 database budget
 
 
@@ -56,12 +57,15 @@ async def traffic(session: AsyncSession) -> JobResult:
     top, _ = await ranking.rank(
         session, profile["weights"], "s.road_class <> 'MUNICIPAL'", "true", {}, limit=TOP_SEGMENTS
     )
+    # The focus area around UTP is sampled too, whatever its Peninsula-wide rank (plan A2).
+    utp, _ = await ranking.rank(session, profile["weights"], "s.pilot = 'UTP'", "true", {}, limit=TOP_UTP_SEGMENTS)
+    ids = list(dict.fromkeys(t["segment_id"] for t in top + utp))
     points = await db.rows(
         session,
         """
         select id, ST_Y(ST_LineInterpolatePoint(geom, 0.5)) as lat, ST_X(ST_LineInterpolatePoint(geom, 0.5)) as lng
         from road_segments where id = any(:ids)""",
-        ids=[t["segment_id"] for t in top],
+        ids=ids,
     )
     now = datetime.now(UTC).replace(second=0, microsecond=0)
     stored = calls = 0

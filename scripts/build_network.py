@@ -21,7 +21,7 @@ import psycopg
 import shapely
 from shapely.ops import substring
 
-from common import DATA, METRIC_CRS, RAW, WGS84, sync_dsn
+from common import DATA, METRIC_CRS, RAW, UTP, UTP_RADIUS_M, WGS84, sync_dsn
 from app.services.jurisdiction import (  # noqa: E402  (path set up by common)
     classify,
     jkr_district_key,
@@ -39,7 +39,8 @@ STATE_NAMES = {
     "T": "Terengganu", "D": "Kelantan", "J": "Johor", "M": "Melaka", "N": "Negeri Sembilan",
     "KUL": "Kuala Lumpur", "PJY": "Putrajaya",
 }
-PILOT_DISTRICTS = {("A", "Kinta"), ("KUL", "Kuala Lumpur")}
+# Pilot areas (plan D13), in priority order: a segment in both the UTP circle and Kinta is UTP.
+PILOT_DISTRICTS = {"KINTA": ("A", "Kinta"), "KL": ("KUL", "Kuala Lumpur")}
 MAX_SEGMENT_M = 1000
 HIGHWAY_RANK = ["motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential",
                 "living_street", "service"]
@@ -129,6 +130,13 @@ def build_agencies(states, districts, councils, operators: set[str]):
         rest = kinta.difference(mbi.geometry.union_all())
         add("PBT:Majlis Daerah Batu Gajah", "PBT", "Majlis Daerah Batu Gajah", "A", None, rest,
             contact={"note": "Area derived as Kinta district minus MB Ipoh; confirm the boundary"})
+    # Seri Iskandar's council (plan A2). OSM has no polygon for it either; plan §3 Q1 assumes it
+    # covers the whole of Perak Tengah district.
+    perak_tengah = districts[(districts.code == "A") & (districts.name == "Perak Tengah")]
+    if len(perak_tengah):
+        add("PBT:Majlis Daerah Perak Tengah", "PBT", "Majlis Daerah Perak Tengah", "A", None,
+            perak_tengah.geometry.iloc[0],
+            contact={"note": "Area assumed to be the whole Perak Tengah district; confirm the boundary"})
 
     agencies = gpd.GeoDataFrame(rows, geometry="geometry", crs=WGS84)
     for col in ("contract_valid_to", "contact"):
@@ -153,19 +161,47 @@ def authoritative_ref(ref: str | None) -> str:
     return best.ref or "" if best.source == "REF_TAG" else ""
 
 
-def build_segments(districts):
+def pilot_areas(districts) -> gpd.GeoDataFrame:
+    """The exact pilot areas: a circle around UTP, then the Kinta and KL district polygons."""
+    utp = gpd.GeoSeries(gpd.points_from_xy([UTP[0]], [UTP[1]]), crs=WGS84).to_crs(METRIC_CRS).buffer(UTP_RADIUS_M)
+    rows = [{"pilot": "UTP", "geometry": utp.to_crs(WGS84).iloc[0]}]
+    for pilot, (code, name) in PILOT_DISTRICTS.items():
+        rows.append({"pilot": pilot, "geometry": districts[(districts.code == code) & (districts.name == name)]
+                     .geometry.iloc[0]})
+    return gpd.GeoDataFrame(rows, geometry="geometry", crs=WGS84)
+
+
+def assign_pilot(points: gpd.GeoSeries, areas: gpd.GeoDataFrame) -> pd.Series:
+    """Pilot of each point, or None; the first matching area in PILOT order wins."""
+    hit = gpd.sjoin(gpd.GeoDataFrame(geometry=points.to_crs(WGS84)), areas, predicate="within", how="left")
+    order = {p: i for i, p in enumerate(areas.pilot)}
+    hit["rank"] = hit.pilot.map(order)
+    best = hit.sort_values("rank").groupby(level=0).pilot.first()
+    return best.reindex(points.index)
+
+
+def build_segments(districts, areas):
     roads = gpd.read_parquet(RAW / "roads.parquet")
     log(f"roads in: {len(roads):,}")
     pieces = gpd.overlay(roads, districts[["code", "name", "id", "geometry"]].rename(
         columns={"name": "district", "id": "district_id"}), how="intersection", keep_geom_type=True)
-    pieces = pieces.explode(index_parts=False)
+    pieces = pieces.explode(index_parts=False).reset_index(drop=True)  # unique labels for the joins below
     log(f"pieces after cutting at district borders: {len(pieces):,}")
 
     pieces["route"] = pieces.ref.map(authoritative_ref)
-    pilot = pieces[["code", "district"]].apply(tuple, axis=1).isin(PILOT_DISTRICTS)
+    pilot = assign_pilot(pieces.representative_point(), areas).notna()
     major = pieces.highway.isin({"motorway", "trunk", "primary", "motorway_link", "trunk_link", "primary_link"})
     pieces = pieces[pilot | (pieces.route != "") | major]  # pilot clip: bboxes were generous
     log(f"pieces kept (pilots: all roads; elsewhere: routes and major roads): {len(pieces):,}")
+    # University campuses maintain their own internal roads (plan §3 Q2); public routes through them stay.
+    campus_file = RAW / "campuses.parquet"
+    if campus_file.exists():
+        campuses = gpd.read_parquet(campus_file)
+        inside = gpd.sjoin(gpd.GeoDataFrame(geometry=pieces.representative_point()), campuses, predicate="within",
+                           how="inner").index.unique()
+        private = pieces.index.isin(inside) & (pieces.route == "") & ~major
+        pieces = pieces[~private]
+        log(f"campus roads dropped: {int(private.sum()):,} ({', '.join(campuses.name.dropna().head(5))}…)")
 
     pieces = pieces.to_crs(METRIC_CRS)
     pieces["base_hw"] = pieces.highway.str.replace("_link", "", regex=False)
@@ -202,7 +238,7 @@ def build_segments(districts):
 
 # --- enrichment -----------------------------------------------------------------------------
 
-def enrich(segs, agencies, councils_keys):
+def enrich(segs, agencies, areas):
     cls = [classify(r, h) for r, h in zip(segs.ref, segs.osm_highway)]
     segs["road_class"] = [c.road_class for c in cls]
     segs["federal_category"] = [c.federal_category for c in cls]
@@ -214,6 +250,7 @@ def enrich(segs, agencies, councils_keys):
     mid = segs.geometry.interpolate(0.5, normalized=True)
     hit = gpd.sjoin(gpd.GeoDataFrame(geometry=mid, crs=METRIC_CRS), pbts, predicate="within", how="left")
     segs["pbt_key"] = hit.groupby(level=0).key.first().reindex(segs.index)
+    segs["pilot"] = assign_pilot(mid, areas).values
 
     op_keys = {k[len("EXPRESSWAY:"):]: k for k in agencies.key if k.startswith("EXPRESSWAY:")}
     ids = dict(zip(agencies.key, agencies.id))
@@ -249,7 +286,7 @@ def enrich(segs, agencies, councils_keys):
     # overlapping trees may double-count a little, so the share is capped at 1.
     trees = gpd.read_parquet(RAW / "trees.parquet").to_crs(METRIC_CRS)
     canopy = shapely.make_valid(trees.geometry.where(trees.kind == "wood", trees.geometry.buffer(5)).values)
-    pilot = segs[["code", "district"]].apply(tuple, axis=1).isin(PILOT_DISTRICTS).values
+    pilot = segs.pilot.notna().values
     buf = shapely.buffer(segs.geometry.values[pilot], 30)
     pairs = shapely.STRtree(canopy).query(buf, predicate="intersects")
     covered = pd.Series(shapely.area(shapely.intersection(buf[pairs[0]], canopy[pairs[1]]))).groupby(pairs[0]).sum()
@@ -309,14 +346,15 @@ def load(states, districts, agencies, segs, geo, force: bool) -> None:
         cols = ["osm_way_ids", "name", "ref", "road_class", "federal_category", "osm_highway", "surface", "lanes",
                 "state_code", "district_id", "owner_agency_id", "maintainer_agency_id", "jurisdiction_source",
                 "length_m", "adt", "heavy_pct", "adt_source", "karst", "ex_mining", "tree_cover", "criticality",
-                "cell_id", "geom"]
+                "cell_id", "pilot", "geom"]
         copy_rows(cur, "road_segments", cols, (
             ([int(w) for w in s.osm_way_ids], s.name, s.ref, s.road_class, s.federal_category, s.osm_highway,
              s.surface, None if pd.isna(s.lanes) else int(s.lanes),
              s.code, s.district_id, s.owner_agency_id, s.maintainer_agency_id, s.jurisdiction_source, s.length_m,
              int(s.adt), float(s.heavy_pct), s.adt_source, bool(s.karst), bool(s.ex_mining),
              None if s.tree_cover is None or pd.isna(s.tree_cover) else float(s.tree_cover), float(s.criticality),
-             s.cell_id, f"SRID=4326;{s.geometry.wkt}") for s in segs.itertuples()))
+             s.cell_id, s.pilot if isinstance(s.pilot, str) else None, f"SRID=4326;{s.geometry.wkt}")
+            for s in segs.itertuples()))
         conn.commit()
         log("committed; refreshing segment_components")
         cur.execute("refresh materialized view segment_components")
@@ -337,19 +375,25 @@ def main() -> None:
     states, districts, councils = load_boundaries()
     log(f"states {len(states)}, districts {len(districts)}, councils with polygons {len(councils)}")
     cached = RAW / "segments.parquet"
-    segs = gpd.read_parquet(cached) if args.use_cache else build_segments(districts)
+    areas = pilot_areas(districts)
+    segs = gpd.read_parquet(cached) if args.use_cache else build_segments(districts, areas)
     operators = {o for o, c in zip(segs.operator, segs.ref)
                  if isinstance(o, str) and o and classify(c, None).road_class == "EXPRESSWAY"}
     agencies = build_agencies(states, districts, councils, operators)
     log(f"agencies {len(agencies)}")
     if not args.use_cache:
-        segs = enrich(segs, agencies, None)
+        segs = enrich(segs, agencies, areas)
         segs.to_parquet(cached)
 
     print(segs.road_class.value_counts().to_string())
     print("pilot municipal owners:", Counter(
         agencies.set_index("id").name.reindex(segs[segs.road_class == "MUNICIPAL"].owner_agency_id)).most_common(6))
     print("karst segments:", int(segs.karst.sum()), " ex-mining:", int(segs.ex_mining.sum()))
+    print("pilot segments:", segs.pilot.value_counts().to_dict())
+    utp = segs[segs.pilot == "UTP"]
+    print("UTP area by class:", utp.road_class.value_counts().to_dict())
+    print("UTP area municipal owners:", Counter(
+        agencies.set_index("id").name.reindex(utp[utp.road_class == "MUNICIPAL"].owner_agency_id)).most_common(4))
     geo = gpd.read_file(DATA / "geology.geojson")
     if args.dry_run:
         log("dry run: wrote data/raw/segments.parquet, database untouched")

@@ -327,7 +327,8 @@ def limitations(tr: dict) -> str:
     if tr["synthetic_share"] >= 0.5:
         parts.append(f"Trained on {tr['synthetic_share']:.0%} demo data; accuracy will change with real reports.")
     parts.append(
-        "Trained on the Kinta and Kuala Lumpur pilots, then applied to every road; elsewhere it has "
+        "Trained on the pilot areas (around UTP Seri Iskandar, Kinta and Kuala Lumpur), then applied to every "
+        "road; elsewhere it has "
         "little incident history and only recent weather."
     )
     if tr["hazard"] == "SINKHOLE":

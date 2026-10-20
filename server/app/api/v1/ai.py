@@ -180,7 +180,7 @@ TOOLS = [
                 parameters=_schema(
                     {
                         "state": {"type": "STRING", "description": "State name or code, e.g. Perak or A"},
-                        "district": {"type": "STRING", "description": "District name, e.g. Kinta"},
+                        "district": {"type": "STRING", "description": "District name, e.g. Perak Tengah"},
                         "road_class": {"type": "STRING", "enum": ["FEDERAL", "STATE", "MUNICIPAL", "EXPRESSWAY"]},
                         "limit": {"type": "INTEGER"},
                     }

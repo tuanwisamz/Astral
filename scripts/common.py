@@ -21,8 +21,13 @@ WGS84 = "EPSG:4326"
 # Rough Peninsular Malaysia box; the state polygons make the exact cut.
 PENINSULA_BBOX = (99.5, 1.15, 104.65, 6.75)
 
-# Pilot areas get every road class (spec §4). Boxes are generous; district polygons clip them.
+# Pilot areas get every road class (spec §4). Boxes are generous; build_network clips them to
+# the exact areas: a 15 km circle around UTP (the focus area, plan A2), and the Kinta and KL
+# district polygons.
+UTP = (100.9704, 4.3826)  # Universiti Teknologi PETRONAS, Seri Iskandar (lon, lat)
+UTP_RADIUS_M = 15_000
 PILOT_BBOXES = {
+    "UTP": (100.835, 4.247, 101.105, 4.518),
     "Kinta": (100.95, 4.35, 101.30, 4.85),
     "Kuala Lumpur": (101.58, 3.02, 101.77, 3.25),
 }

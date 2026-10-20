@@ -20,7 +20,7 @@ function navFor(auth: AuthState): NavItem[] {
     return [
       { to: '/map', key: 'nav.map' },
       { to: '/report', key: 'nav.report' },
-      ...(auth.isSignedIn ? [{ to: '/my-reports', key: 'nav.myReports' }] : []),
+      ...(auth.isSignedIn ? [{ to: '/my-reports', key: 'nav.myReports' }, { to: '/settings', key: 'nav.settings' }] : []),
     ]
   }
   return [
@@ -31,6 +31,7 @@ function navFor(auth: AuthState): NavItem[] {
     { to: '/analysis', key: 'nav.analysis' },
     { to: '/assistant', key: 'nav.assistant' },
     ...(auth.role === 'admin' || auth.role === 'dev' ? [{ to: '/admin', key: 'nav.admin' }] : []),
+    { to: '/settings', key: 'nav.settings' },
   ]
 }
 
@@ -94,7 +95,7 @@ function AccountMenu() {
   }
   return (
     <div className="flex items-center gap-3">
-      <span className="hidden max-w-48 truncate text-sm text-road sm:inline">{auth.email}</span>
+      <Link to="/settings" className="hidden max-w-48 truncate text-sm text-road underline-offset-4 hover:underline sm:inline">{auth.email}</Link>
       <button type="button" onClick={() => void auth.signOut()} className={buttonClass('quiet', 'px-2')}>
         {t('app.signOut')}
       </button>

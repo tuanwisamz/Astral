@@ -26,6 +26,7 @@ const Report = lazy(() => import('../pages/Report'))
 const ReportStatus = lazy(() => import('../pages/ReportStatus'))
 const RoadAnalysis = lazy(() => import('../pages/RoadAnalysis'))
 const Zones = lazy(() => import('../pages/Zones'))
+const Settings = lazy(() => import('../pages/Settings'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
@@ -70,6 +71,7 @@ const router = createBrowserRouter([
           { path: 'report', element: signedIn(<Report />) },
           { path: 'report/:ref', element: signedIn(<ReportStatus />) },
           { path: 'my-reports', element: signedIn(<MyReports />) },
+          { path: 'settings', element: signedIn(<Settings />) },
           { path: 'priority', element: staff(<Priority />) },
           { path: 'zones', element: staff(<Zones />) },
           { path: 'zones/:zoneId', element: staff(<Zones />) },

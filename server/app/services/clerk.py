@@ -78,3 +78,25 @@ async def public_metadata(clerk_id: str) -> dict:
     meta = res.json().get("public_metadata") or {}
     _metadata_cache[clerk_id] = (now + METADATA_TTL_S, meta)
     return meta
+
+
+async def count_admins(max_users: int = 2000) -> int:
+    """Admins in Clerk (the source of truth, D4). Clerk can't filter by metadata, so page through."""
+    admins, offset = 0, 0
+    while offset < max_users:
+        page = (await _request("GET", "/users", params={"limit": 100, "offset": offset})).json()
+        admins += sum((u.get("public_metadata") or {}).get("role") == "admin" for u in page)
+        if len(page) < 100:
+            break
+        offset += 100
+    return admins
+
+
+async def delete_user(clerk_id: str) -> None:
+    """Deletes the Clerk account, which also ends its sessions. Already gone counts as done."""
+    try:
+        await _request("DELETE", f"/users/{clerk_id}")
+    except ApiError as exc:
+        if exc.status != 404:
+            raise
+    _metadata_cache.pop(clerk_id, None)

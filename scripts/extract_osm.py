@@ -2,7 +2,8 @@
 
 Keeps every road in the pilot areas, and elsewhere only routes with a federal, state or
 expressway ref plus major roads (spec §4 "Data depth"). Also extracts admin boundaries,
-critical facilities (hospitals, schools, fire stations) and tree features for T1.6.
+critical facilities (hospitals, schools, fire stations) and tree features for T1.6, and
+university campuses in the pilots, whose internal roads are private (plan §3 Q2).
 """
 
 import re
@@ -23,14 +24,14 @@ wkbf = osmium.geom.WKBFactory()
 
 
 def main() -> None:
-    roads, bounds, facilities, trees = [], [], [], []
+    roads, bounds, facilities, trees, campuses = [], [], [], [], []
     started = time.time()
     proc = (
         osmium.FileProcessor(str(PBF))
         .with_locations()
         .with_areas(osmium.filter.TagFilter(("boundary", "administrative"), ("natural", "wood"),
                                             ("landuse", "forest"), ("amenity", "hospital"),
-                                            ("amenity", "school")))
+                                            ("amenity", "school"), ("amenity", "university")))
     )
     for obj in proc:
         tags = obj.tags
@@ -54,6 +55,8 @@ def main() -> None:
                     pilot = in_pilot(first.lon, first.lat)
                     if hw == "service" and not tags.get("name"):
                         continue  # parking aisles and driveways
+                    if tags.get("access") in ("private", "no") and not ref:
+                        continue  # gated and private roads: neither JKR nor a council maintains them
                     if not pilot and not (ref and ROUTE_REF.search(ref)) and hw not in MAJOR_HIGHWAYS:
                         continue
                     roads.append({
@@ -77,6 +80,11 @@ def main() -> None:
                             "name": tags.get("name"), "name_en": tags.get("name:en"), "name_ms": tags.get("name:ms"),
                             "ref": tags.get("ref"), "iso": tags.get("ISO3166-2"), "geometry": geom,
                         })
+                elif tags.get("amenity") == "university":
+                    geom = wkb.loads(wkbf.create_multipolygon(obj), hex=True)
+                    c = geom.representative_point()
+                    if in_pilot(c.x, c.y):
+                        campuses.append({"name": tags.get("name"), "geometry": geom})
                 elif (tags.get("amenity") in CRITICAL):
                     geom = wkb.loads(wkbf.create_multipolygon(obj), hex=True).representative_point()
                     if in_box(geom.x, geom.y, PENINSULA_BBOX):
@@ -89,7 +97,8 @@ def main() -> None:
         except (osmium.InvalidLocationError, RuntimeError):
             continue  # incomplete geometry at the extract's edge
 
-    for name, rows in (("roads", roads), ("boundaries", bounds), ("facilities", facilities), ("trees", trees)):
+    for name, rows in (("roads", roads), ("boundaries", bounds), ("facilities", facilities), ("trees", trees),
+                       ("campuses", campuses)):
         gdf = gpd.GeoDataFrame(rows, geometry="geometry", crs=WGS84)
         gdf.to_parquet(RAW / f"{name}.parquet")
         print(f"{name:11s} {len(gdf):>8,d} rows")

@@ -1,6 +1,7 @@
 import { ClerkProvider, useAuth, useClerk, useUser } from '@clerk/clerk-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 
 import { apiFetch, type TokenGetter } from '../lib/api'
@@ -20,7 +21,9 @@ export interface AuthState {
   /** 'dev' only in local development without Clerk: every page is reachable. */
   role: Role | 'dev'
   email: string | null
-  signOut: () => Promise<void>
+  signOut: (redirectUrl?: string) => Promise<void>
+  /** Saves the language to the account so it follows the person to other devices (plan A3). */
+  saveLanguage: (lang: string) => Promise<void>
 }
 
 const DEV_STATE: AuthState = {
@@ -30,6 +33,7 @@ const DEV_STATE: AuthState = {
   role: import.meta.env.DEV ? 'dev' : 'public',
   email: null,
   signOut: async () => {},
+  saveLanguage: async () => {},
 }
 
 const noToken: TokenGetter = async () => null
@@ -47,10 +51,27 @@ function ClerkBridge({ children }: { children: ReactNode }) {
   const clerk = useClerk()
   const queryClient = useQueryClient()
 
-  const signOut = useCallback(async () => {
-    await clerk.signOut({ redirectUrl: '/sign-in' })
+  const signOut = useCallback(async (redirectUrl = '/sign-in') => {
+    await clerk.signOut({ redirectUrl })
     queryClient.clear() // nothing from the last account stays on screen
   }, [clerk, queryClient])
+
+  const { i18n } = useTranslation()
+  const savedLang = user?.unsafeMetadata?.lang as string | undefined
+  const saveLanguage = useCallback(async (lang: string) => {
+    if (user && savedLang !== lang) await user.update({ unsafeMetadata: { ...user.unsafeMetadata, lang } })
+  }, [user, savedLang])
+  // On sign-in, the account's language wins over this browser's.
+  useEffect(() => {
+    if (savedLang && savedLang !== i18n.language) {
+      void i18n.changeLanguage(savedLang)
+      try {
+        localStorage.setItem('lang', savedLang)
+      } catch {
+        // not remembered on this device; the account still has it
+      }
+    }
+  }, [savedLang, i18n])
 
   // The role is read for display and routing only; the API enforces it (spec NFR-08).
   const metaRole = user?.publicMetadata?.role as Role | undefined
@@ -62,8 +83,9 @@ function ClerkBridge({ children }: { children: ReactNode }) {
       role: metaRole && (['public', ...STAFF] as string[]).includes(metaRole) ? metaRole : 'public',
       email: user?.primaryEmailAddress?.emailAddress ?? null,
       signOut,
+      saveLanguage,
     }),
-    [isLoaded, isSignedIn, metaRole, user, signOut],
+    [isLoaded, isSignedIn, metaRole, user, signOut, saveLanguage],
   )
 
   return (

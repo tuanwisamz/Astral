@@ -132,3 +132,8 @@ I checked the first draft against what a generic dashboard would get, and change
   - **Empty values:** a road with no recommended action shows nothing rather than a dash, and an unnamed road says "Unnamed road".
   - **Special zones** on the Zones page use the same ledger rows as the districts, with the zone type on the right.
   - **Google button:** carries the standard four-colour "G" (18 px, left of the label), as Google's sign-in branding guidelines require. It is the one place where colour outside the palette is allowed.
+- 20 Oct, Settings (`/settings`):
+  - **Layout:** each block is a two-column row, heading and one-line explanation on the left, controls on the right. On phones they stack.
+  - **Danger section:** Delete account sits last, marked by a red left rule. Its button is outlined in overdue red, never yellow: yellow means "act here", and deleting is the one action we don't want to invite. It's confirmed by typing DELETE, and the result is said on the landing page ("Your account is deleted.").
+  - **Language:** two large radio cards, each language named in itself. It's the same setting as the header toggle, saved to the account.
+- 20 Oct, tab icon: the Road paint tile at a new URL (`/icon.svg`), plus `favicon.ico` and a 180 px `apple-touch-icon.png`. The new URL forces browsers to drop the cached Vite icon.

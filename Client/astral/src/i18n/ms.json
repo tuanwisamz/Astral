@@ -23,7 +23,8 @@
     "report": "Laporkan bahaya",
     "myReports": "Laporan saya",
     "assistant": "Pembantu",
-    "admin": "Pentadbir"
+    "admin": "Pentadbir",
+    "settings": "Tetapan"
   },
   "scope": {
     "label": "Skop",
@@ -516,9 +517,9 @@
   "assistant": {
     "intro": "Tanya tentang jalan di kawasan anda. Jawapan datang daripada data sistem ini dan menamakan jalan yang dirujuk.",
     "try": "Cuba tanya",
-    "example1": "5 jalan persekutuan mana di Kinta yang perlu dibaiki bulan ini, dan kenapa?",
+    "example1": "5 jalan persekutuan mana di Perak Tengah yang perlu dibaiki bulan ini, dan kenapa?",
     "example2": "Adakah amaran cuaca di Perak sekarang?",
-    "example3": "Apakah risiko lubang benam di Jalan Tambun?",
+    "example3": "Apakah risiko lubang benam di Jalan Tronoh?",
     "label": "Soalan anda",
     "placeholder": "Tanya tentang jalan, bahaya atau amaran",
     "ask": "Tanya",
@@ -571,5 +572,44 @@
       "body": "Log masuk untuk melihat jalan yang perlu dibaiki dahulu.",
       "action": "Log masuk"
     }
+  },
+  "settings": {
+    "account": "Akaun",
+    "accountBody": "Peranan dan kawasan anda ditetapkan oleh pentadbir JKR.",
+    "email": "E-mel",
+    "role": "Peranan",
+    "area": "Kawasan",
+    "agency": "Agensi",
+    "reports": "Laporan dihantar",
+    "reportCount_one": "{{count}} laporan",
+    "reportCount_other": "{{count}} laporan",
+    "language": "Bahasa",
+    "languageBody": "Disimpan dalam akaun anda, jadi ia mengikut anda ke peranti lain.",
+    "password": "Kata laluan",
+    "passwordBody": "Menukarnya akan melog keluar anda di peranti lain.",
+    "currentPassword": "Kata laluan semasa",
+    "changePassword": "Tukar kata laluan",
+    "changingPassword": "Menukar kata laluan",
+    "passwordChanged": "Kata laluan ditukar",
+    "passwordGoogle": "Anda log masuk dengan Google, jadi kata laluan anda diuruskan oleh Google.",
+    "google": "Akaun Google",
+    "googleBody": "Log masuk dengan Google tanpa menaip kata laluan.",
+    "googleLinked": "Dipautkan kepada {{email}}.",
+    "googleNotLinked": "Tiada akaun Google dipautkan.",
+    "linkGoogle": "Pautkan akaun Google",
+    "unlinkGoogle": "Nyahpaut akaun Google",
+    "googleUnlinked": "Akaun Google dinyahpaut",
+    "googleOnlyWay": "Google satu-satunya cara anda log masuk. Tetapkan kata laluan dahulu, kemudian anda boleh menyahpautnya.",
+    "delete": "Padam akaun",
+    "deleteBody": "Ini tidak boleh dibuat asal.",
+    "deleteWhat1": "E-mel dan log masuk anda dipadam, dan anda dilog keluar di semua peranti.",
+    "deleteWhat2": "Bahaya yang anda laporkan kekal pada peta kerana ia masih di jalan, tetapi tiada apa yang mengaitkannya dengan anda.",
+    "deleteWhat3": "Senarai laporan anda dipadam bersama akaun.",
+    "typeToConfirm": "Taip {{word}} untuk mengesahkan",
+    "deleteButton": "Padam akaun saya",
+    "deleting": "Memadam akaun",
+    "lastAdmin": "Anda satu-satunya pentadbir, jadi akaun ini tidak boleh dipadam. Jadikan orang lain pentadbir dahulu.",
+    "notConnected": "Log masuk tidak disambungkan dalam salinan aplikasi ini, jadi tiada akaun untuk diurus.",
+    "deleted": "Akaun anda telah dipadam."
   }
 }

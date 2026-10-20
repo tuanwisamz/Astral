@@ -20,7 +20,7 @@ import { HAZARD_TYPES, HAZARDS, type HazardType } from '../lib/hazards'
 import type { PhotoAnalysis, ReportResult } from '../lib/types'
 
 const TILE_URL: string = import.meta.env.VITE_MAP_TILE_URL ?? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-const IPOH: [number, number] = [4.597, 101.09]
+const UTP: [number, number] = [4.3826, 100.9704] // focus area: UTP Seri Iskandar (plan A2)
 type Step = 'photo' | 'location' | 'details' | 'done'
 
 interface Photo {
@@ -149,7 +149,7 @@ export default function Report() {
     setHazard(null); setSeverity(3); setDescription(''); setResult(null); setLocationError(null); analyze.reset(); submit.reset()
   }
 
-  const centre = useMemo<[number, number]>(() => position ?? IPOH, [position])
+  const centre = useMemo<[number, number]>(() => position ?? UTP, [position])
 
   return (
     <div className="mx-auto max-w-lg px-4 py-6 sm:py-10">

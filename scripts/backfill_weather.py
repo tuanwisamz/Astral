@@ -1,5 +1,7 @@
 """T5.2 backfill, moved to M2 by the plan: 12 months of daily rain and wind for the pilot cells
 (the synthetic generator and the models need history), then today's forecast for every cell.
+Cells that already hold most of a year of history are skipped, so adding a pilot area only
+fetches its new cells.
 
     .venv\\Scripts\\python scripts\\backfill_weather.py
 """
@@ -12,7 +14,7 @@ from app.core import db
 from app.ingest import weather
 from app.services import usage
 
-PILOTS = [("A", "Kinta"), ("KUL", "Kuala Lumpur")]
+HAVE_HISTORY_DAYS = 300  # a cell with this many observed days is already backfilled
 ARCHIVE_LAG_DAYS = 6  # the archive trails real time by a few days; past_days covers the gap
 
 
@@ -20,8 +22,9 @@ async def main() -> None:
     db.get_engine()
     async with db._sessionmaker() as session:
         cells = [r["cell_id"] for r in await db.rows(session, """
-            select distinct s.cell_id from road_segments s join districts d on d.id = s.district_id
-            where (d.state_code, d.name) in (('A', 'Kinta'), ('KUL', 'Kuala Lumpur')) order by 1""")]
+            select c.cell_id from (select distinct cell_id from road_segments where pilot is not null) c
+            where (select count(*) from weather_daily w where w.cell_id = c.cell_id and not w.is_forecast)
+                  < :have order by 1""", have=HAVE_HISTORY_DAYS)]
         end = date.today() - timedelta(days=ARCHIVE_LAG_DAYS)
         start = end - timedelta(days=365)
         print(f"archive {start}..{end} for {len(cells)} pilot cells")

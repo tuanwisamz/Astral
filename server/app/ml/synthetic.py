@@ -1,5 +1,6 @@
 """Synthetic demo data (T1.8, architechture.md §16): 12 months of incidents and 3 years of
-accidents on real pilot segments (Kinta, Kuala Lumpur), with seasonality and geology.
+accidents on real pilot segments (around UTP Seri Iskandar, Kinta, Kuala Lumpur), with
+seasonality and geology.
 
 Rules from the plan:
 - Its own weights and per-road noise, deliberately different from the rule-based baseline,
@@ -23,8 +24,11 @@ from app.services import sla
 
 SEED = 20261019
 DAYS = 365
-TARGETS = {"POTHOLE": 5200, "SINKHOLE": 32, "FALLEN_TREE": 480}  # expected per year across both pilots
+# Expected per year, tuned on the Kinta and KL pilots (8,194 km of road); scaled to the pilot
+# length actually loaded, so adding an area keeps the same density.
+TARGETS = {"POTHOLE": 5200, "SINKHOLE": 32, "FALLEN_TREE": 480}
 ACCIDENTS_3Y = 950
+TUNED_KM = 8194
 CLASS_POTHOLE = {"FEDERAL": 1.3, "STATE": 1.0, "MUNICIPAL": 0.55, "EXPRESSWAY": 0.45, "UNKNOWN": 0.7}
 CLASS_CRASH = {"FEDERAL": 1.5, "STATE": 1.0, "MUNICIPAL": 0.45, "EXPRESSWAY": 1.2, "UNKNOWN": 0.6}
 SEVERITY_P = {
@@ -88,7 +92,10 @@ def simulate(
         "SINKHOLE": (1 + 7 * segs.karst.to_numpy() + 4 * segs.ex_mining.to_numpy()) * km * noise["SINKHOLE"],
         "FALLEN_TREE": (0.02 + segs.tree_cover.to_numpy()) ** 1.5 * km * noise["FALLEN_TREE"],
     }
-    base = {h: TARGETS[h] / (static[h] * factors[h][:, cell_idx]).sum() * (DAYS / len(factors[h])) for h in TARGETS}
+    scale = km.sum() / TUNED_KM
+    base = {
+        h: TARGETS[h] * scale / (static[h] * factors[h][:, cell_idx]).sum() * (DAYS / len(factors[h])) for h in TARGETS
+    }
     last_pothole = np.full(len(segs), -10_000)
     events: list[Event] = []
     for d in range(len(factors["POTHOLE"])):
@@ -204,7 +211,7 @@ def build_accidents(segs: pd.DataFrame, now: datetime, rng: np.random.Generator)
         * segs.road_class.map(CLASS_CRASH).to_numpy()
         * rng.lognormal(0, 0.7, len(segs))
     )
-    counts = rng.poisson(weight / weight.sum() * ACCIDENTS_3Y)
+    counts = rng.poisson(weight / weight.sum() * ACCIDENTS_3Y * km.sum() / TUNED_KM)
     out = []
     for i in np.flatnonzero(counts):
         for _ in range(counts[i]):
@@ -221,24 +228,32 @@ def build_accidents(segs: pd.DataFrame, now: datetime, rng: np.random.Generator)
     return out
 
 
-def _pick(segs: pd.DataFrame, mask, prefer: str | None = None, sort: str = "length_m") -> pd.Series:
+def _pick(
+    segs: pd.DataFrame, mask, prefer: str | None = None, sort: str = "length_m", ascending: bool = False
+) -> pd.Series:
     """A named road for each scene, so the demo talks about places people recognise."""
     cand = segs[mask & segs.name.notna()]
     if prefer is not None:
         named = cand[cand.name.str.fullmatch(prefer, case=False)]
         cand = named if len(named) else cand
-    return cand.sort_values([sort, "id"], ascending=[False, True]).iloc[0]
+    return cand.sort_values([sort, "id"], ascending=[ascending, True]).iloc[0]
 
 
 def plant_storyline(
     segs: pd.DataFrame, now: datetime, rng: np.random.Generator
 ) -> tuple[list[dict], list[dict], list[dict], list[str]]:
-    """The demo script's scenes (task.md), on real roads: Kinta's #1 federal road, an open
-    sinkhole on Kinta karst, a lane-blocking tree in KL, and a few overdue repairs."""
+    """The demo script's scenes (task.md), on real roads around UTP Seri Iskandar (plan A2): FT5
+    near UTP as Perak Tengah's #1 road, an open sinkhole on the nearest other road on ex-mining
+    land, a lane-blocking tree on a Seri Iskandar street, and a few overdue repairs nearby."""
     notes, incs, accs = [], [], []
-    kinta = segs.district == "Kinta"
-    top = _pick(segs, kinta & (segs.road_class == "FEDERAL"), "Jalan Sultan Azlan Shah")
-    for days_ago, sev in ((80, 3), (55, 4), (30, 3)):
+    utp = segs.pilot == "UTP"
+    perak_tengah = utp & (segs.district == "Perak Tengah")
+    ft5 = segs.ref.fillna("").str.fullmatch(r"(FT\s*)?5")
+    # The FT5 segment within 3 km of UTP with the most services nearby: criticality is a fixed
+    # component, so a quiet stretch could never honestly top the district.
+    near = segs[perak_tengah & (segs.road_class == "FEDERAL") & ft5 & (segs.utp_m < 3000)]
+    top = near.sort_values(["criticality", "utp_m", "id"], ascending=[False, True, True]).iloc[0]
+    for days_ago, sev in ((80, 3), (55, 4), (30, 3), (12, 3)):
         incs.append(make_incident(top, int(top.id), "POTHOLE", now - timedelta(days=days_ago), now, rng, severity=sev))
     incs.append(
         make_incident(
@@ -253,6 +268,10 @@ def plant_storyline(
             confirmations=3,
         )
     )
+    # A repair that slipped past its deadline: the recurring-pothole story in one more incident.
+    incs.append(
+        make_incident(top, int(top.id), "POTHOLE", now - timedelta(days=4), now, rng, status="ASSIGNED", severity=3)
+    )
     for deaths, injuries, days_ago in ((1, 2, 400), (1, 4, 210), (0, 3, 60)):
         accs.append(
             {
@@ -263,9 +282,13 @@ def plant_storyline(
                 "injuries": injuries,
             }
         )
-    notes.append(f"#1 road: {top['name'] or 'unnamed'} ({top.ref}) segment {top.id}")
+    notes.append(
+        f"#1 road: {top['name'] or 'unnamed'} ({top.ref}) segment {top.id}, {top.utp_m / 1000:.1f} km from UTP"
+    )
 
-    sink = _pick(segs, kinta & segs.karst & segs.road_class.isin(["FEDERAL", "STATE"]), "Jalan Tambun")
+    # A different road from the #1 story, so each scene is about one place.
+    mining = utp & segs.ex_mining & segs.road_class.isin(["FEDERAL", "STATE"]) & (segs.name != top["name"])
+    sink = _pick(segs, mining, sort="utp_m", ascending=True)
     incs.append(
         make_incident(
             sink,
@@ -281,8 +304,8 @@ def plant_storyline(
     )
     notes.append(f"open sinkhole: {sink['name'] or 'unnamed'} ({sink.ref}) segment {sink.id}")
 
-    kl = segs.district == "Kuala Lumpur"
-    tree = _pick(segs, kl & segs.name.notna() & (segs.tree_cover > 0.3), sort="tree_cover")
+    town = perak_tengah & (segs.road_class == "MUNICIPAL") & (segs.utp_m < 6000)
+    tree = _pick(segs, town, sort="tree_cover")
     incs.append(
         make_incident(
             tree,
@@ -298,12 +321,21 @@ def plant_storyline(
     )
     notes.append(f"fallen tree blocking a lane: {tree['name']} segment {tree.id}")
 
-    fed = (
-        segs[kinta & (segs.road_class == "FEDERAL") & segs.name.notna() & (segs.name != top["name"])]
-        .sort_values(["length_m", "id"], ascending=[False, True])
+    nearby = (
+        # In the Kinta part of the area (Tronoh, Batu Gajah), so they don't compete with the #1 road
+        # in the Perak Tengah ranking.
+        segs[
+            utp
+            & (segs.district != "Perak Tengah")
+            & segs.road_class.isin(["FEDERAL", "STATE"])
+            & segs.name.notna()
+            & ~segs.name.isin([top["name"], sink["name"]])
+        ]
+        .sort_values(["utp_m", "id"])
+        .drop_duplicates("name")
         .head(3)
     )
-    for _, seg in fed.iterrows():
+    for _, seg in nearby.iterrows():
         incs.append(
             make_incident(
                 seg,
@@ -316,7 +348,7 @@ def plant_storyline(
                 severity=4,
             )
         )
-    notes.append(f"overdue potholes on {len(fed)} more Kinta federal segments")
+    notes.append(f"overdue potholes on {', '.join(nearby.name)}")
     timeline = [e for i in incs for e in i.pop("_events")]
     return incs, accs, timeline, notes
 

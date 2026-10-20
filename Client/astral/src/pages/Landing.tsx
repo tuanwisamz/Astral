@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 
 import { GuestOnly } from '../app/guards'
 import { buttonClass } from '../components/ui/Button'
@@ -12,6 +12,7 @@ const CENTRE_LINE = 'repeating-linear-gradient(to bottom, var(--color-marking) 0
 /** First page for signed-out visitors: what the product is, then one way in per audience (DESIGN.md). */
 export default function Landing() {
   const { t } = useTranslation()
+  const [params] = useSearchParams()
   const paths = [
     { key: 'report', to: '/report', variant: 'primary' as const },
     { key: 'map', to: '/map', variant: 'secondary' as const },
@@ -58,6 +59,9 @@ export default function Landing() {
 
         <main className="flex items-center px-6 py-10 sm:px-12 lg:py-14">
           <div className="w-full max-w-sm">
+            {params.get('deleted') && (
+              <p role="status" className="mb-6 border-l-4 border-asphalt pl-3">{t('settings.deleted')}</p>
+            )}
             <h2 className="text-2xl font-semibold">{t('landing.choose')}</h2>
             <ul className="mt-6 divide-y divide-hairline border-y border-hairline">
               {paths.map((p) => (

@@ -76,14 +76,7 @@ class Context:
 
 
 def segments(conn, pilots_only: bool) -> pd.DataFrame:
-    where = (
-        (
-            "join districts d on d.id = s.district_id where (d.state_code, d.name) in "
-            "(('A', 'Kinta'), ('KUL', 'Kuala Lumpur'))"
-        )
-        if pilots_only
-        else ""
-    )
+    where = ("where s.pilot is not null") if pilots_only else ""
     return frame(
         conn,
         f"""

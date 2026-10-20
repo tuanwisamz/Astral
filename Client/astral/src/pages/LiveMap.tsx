@@ -38,7 +38,7 @@ import type {
 } from '../lib/types'
 
 const TILE_URL: string = import.meta.env.VITE_MAP_TILE_URL ?? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-const IPOH: [number, number] = [4.597, 101.1]
+const UTP: [number, number] = [4.3826, 100.9704] // focus area: UTP Seri Iskandar (plan A2)
 const OPEN = 'REPORTED,VERIFIED,ASSIGNED,MITIGATED'
 const LEVELS: RiskLevel[] = ['LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH']
 const LOCATE_MIN_ZOOM = 14
@@ -218,7 +218,7 @@ export default function LiveMap() {
         </div>
       )}
       <div className="relative min-h-0 flex-1">
-        <MapContainer center={IPOH} zoom={14} preferCanvas className="h-full w-full">
+        <MapContainer center={UTP} zoom={14} preferCanvas className="h-full w-full">
           <TileLayer url={TILE_URL} attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />
           <BboxWatcher onChange={onBbox} />
           <MapClick onClick={onMapClick} />
