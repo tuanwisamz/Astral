@@ -1,0 +1,45 @@
+{
+  "type": "FeatureCollection",
+  "name": "pilot_geology",
+  "note": "T1.5. Broad, hand-drawn approximations of karst (limestone) and ex-mining land in the two pilot areas, for the demo only. They are NOT survey data. Replace with polygons digitised from JMG geological and mining-land maps before any real use.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {"kind": "karst", "name": "Kinta Valley limestone (approximate)", "approximate": true},
+      "geometry": {"type": "Polygon", "coordinates": [[
+        [101.04, 4.72], [101.17, 4.72], [101.19, 4.55], [101.16, 4.40],
+        [101.10, 4.35], [101.03, 4.40], [101.02, 4.55], [101.04, 4.72]
+      ]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"kind": "ex_mining", "name": "Kinta tin-mining belt (approximate)", "approximate": true},
+      "geometry": {"type": "Polygon", "coordinates": [[
+        [101.00, 4.60], [101.10, 4.60], [101.14, 4.48], [101.10, 4.38],
+        [101.00, 4.40], [100.98, 4.50], [101.00, 4.60]
+      ]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"kind": "karst", "name": "Kuala Lumpur Limestone (approximate)", "approximate": true},
+      "geometry": {"type": "Polygon", "coordinates": [[
+        [101.66, 3.25], [101.70, 3.25], [101.74, 3.15], [101.73, 3.05],
+        [101.69, 3.04], [101.66, 3.10], [101.67, 3.18], [101.66, 3.25]
+      ]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"kind": "ex_mining", "name": "Sungai Besi former mining land (approximate)", "approximate": true},
+      "geometry": {"type": "Polygon", "coordinates": [[
+        [101.69, 3.08], [101.73, 3.08], [101.74, 3.03], [101.70, 3.02], [101.69, 3.08]
+      ]]}
+    },
+    {
+      "type": "Feature",
+      "properties": {"kind": "ex_mining", "name": "Kepong and Jinjang former mining land (approximate)", "approximate": true},
+      "geometry": {"type": "Polygon", "coordinates": [[
+        [101.61, 3.24], [101.67, 3.24], [101.67, 3.19], [101.62, 3.19], [101.61, 3.24]
+      ]]}
+    }
+  ]
+}

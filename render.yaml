@@ -1,0 +1,43 @@
+# Render Blueprint for the API (T9.1). In Render: New → Blueprint → this repo.
+# Secrets are `sync: false`: Render asks for them on first deploy and never reads them from git.
+services:
+  - type: web
+    name: smart-analysis-road-api
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: server
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: CLERK_JWKS_URL
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_AUTHORIZED_PARTIES
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL_VISION
+        value: gemini-3.6-flash
+      - key: GEMINI_MODEL_LITE
+        value: gemini-3.5-flash-lite
+      - key: TOMTOM_API_KEY
+        sync: false
+      - key: NOMINATIM_USER_AGENT
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false

@@ -1,0 +1,16 @@
+# Local development database: PostGIS standing in for Supabase.
+# Start with `docker compose up -d`; matches DATABASE_URL in server/.env.example.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: astral
+    ports:
+      - "54322:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

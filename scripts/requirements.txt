@@ -1,0 +1,8 @@
+# One-off data loaders (T1.1–T1.7). Not installed on Render.
+-r ../server/requirements.txt
+osmium==4.3.2
+geopandas==1.2.0
+shapely==2.2.0
+pyproj==3.7.2
+psycopg[binary]==3.3.6
+pyarrow==26.0.0

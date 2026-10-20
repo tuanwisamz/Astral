@@ -1,0 +1,8 @@
+# Nightly training and prediction in GitHub Actions (plan D2). Never installed on Render.
+-r requirements.txt
+psycopg[binary]==3.3.6
+numpy==2.4.6
+pandas==3.0.6
+scikit-learn==1.9.1
+shap==0.51.0
+joblib==1.6.0

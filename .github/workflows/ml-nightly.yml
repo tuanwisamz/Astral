@@ -1,0 +1,30 @@
+# Nightly training and prediction (T6.3, T6.4, plan D2): runs here, not on Render, because
+# Render's free instance has 512 MB of RAM. Writes predictions and the model card to Supabase.
+# Needs the repository secret DATABASE_URL (the Supabase session pooler, port 5432).
+name: Nightly predictions
+
+on:
+  schedule:
+    - cron: "0 18 * * *"  # 02:00 MYT
+  workflow_dispatch:
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: server/requirements*.txt
+      - run: pip install -r requirements-ml.txt
+      - name: Train, evaluate and predict
+        env:
+          APP_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python -m app.ml.models

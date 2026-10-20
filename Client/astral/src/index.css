@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/* Road paint tokens — see DESIGN.md. Hazard colours stay in lib/hazards.ts (spec FR-MAP-01). */
+@theme {
+  --color-asphalt: #2e3236;
+  --color-road: #5a6168;
+  --color-concrete: #edefee;
+  --color-kerb: #ffffff;
+  --color-marking: #f5c400;
+  --color-overdue: #c62828;
+  --color-hairline: #d6dadb;
+
+  --color-pothole: #6b7280;
+  --color-tree: #16a34a;
+  --color-sinkhole: #8b4513;
+
+  --font-sans: "Barlow", ui-sans-serif, system-ui, sans-serif;
+  --font-condensed: "Barlow Condensed", "Barlow", ui-sans-serif, sans-serif;
+
+  /* Traditional scale: 12 / 14 / 16 / 18 / 21 / 24 / 36 */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.3125rem;
+  --text-2xl: 1.5rem;
+  --text-4xl: 2.25rem;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-concrete);
+  color: var(--color-asphalt);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+/* One focus style everywhere: yellow ring with an asphalt edge, visible on white and on asphalt. */
+:focus-visible {
+  outline: 2px solid var(--color-asphalt);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 5px var(--color-marking);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.leaflet-container {
+  font: inherit;
+}
+
+/* divIcon markers draw their own SVG; drop Leaflet's default white box. */
+.hazard-marker {
+  background: none;
+  border: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,47 @@
+# Scheduled data jobs (architechture.md §8, T5.6). GitHub cron runs in UTC; MYT = UTC+8.
+# Needs repository secrets API_BASE (e.g. https://<api>.onrender.com/api/v1) and CRON_SECRET.
+name: Data jobs
+
+on:
+  schedule:
+    - cron: "0 */3 * * *"   # warnings, every 3 h
+    - cron: "0 22 * * *"    # forecast, 06:00 MYT
+    - cron: "0 21 * * *"    # weather, 05:00 MYT
+    - cron: "15 * * * *"    # news, traffic and flood, hourly
+    - cron: "30 20 * * *"   # cleanup, 04:30 MYT (also keeps Supabase awake)
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Job to run now"
+        required: true
+        type: choice
+        options: [warnings, forecast, weather, news, traffic, flood, priority, cleanup]
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pick jobs for this schedule
+        id: pick
+        run: |
+          case "${{ github.event.schedule }}" in
+            "0 */3 * * *")  echo "jobs=warnings" >> "$GITHUB_OUTPUT" ;;
+            "0 22 * * *")   echo "jobs=forecast" >> "$GITHUB_OUTPUT" ;;
+            "0 21 * * *")   echo "jobs=weather" >> "$GITHUB_OUTPUT" ;;
+            "15 * * * *")   echo "jobs=news traffic flood" >> "$GITHUB_OUTPUT" ;;
+            "30 20 * * *")  echo "jobs=cleanup" >> "$GITHUB_OUTPUT" ;;
+            *)              echo "jobs=${{ inputs.job }}" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - name: Call the API (the first call may wait while Render wakes up)
+        env:
+          API_BASE: ${{ secrets.API_BASE }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          status=0
+          for job in ${{ steps.pick.outputs.jobs }}; do
+            echo "::group::$job"
+            curl --fail-with-body --retry 3 --retry-delay 30 --max-time 900 -sS -X POST \
+              -H "X-Cron-Secret: $CRON_SECRET" "$API_BASE/internal/jobs/$job" || status=1
+            echo "::endgroup::"
+          done
+          exit $status

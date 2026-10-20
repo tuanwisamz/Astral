@@ -1,0 +1,15 @@
+# Netlify build for the frontend (T9.1). Set VITE_API_BASE, VITE_CLERK_PUBLISHABLE_KEY and
+# VITE_MAP_TILE_URL in Netlify → Site configuration → Environment variables.
+[build]
+  base = "Client/astral"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+# Single-page app: every route serves index.html (public/_redirects does the same).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
