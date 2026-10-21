@@ -6,6 +6,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { LanguageToggle } from '../components/LanguageToggle'
 import { Onboarding } from '../components/Onboarding'
 import { buttonClass } from '../components/ui/Button'
+import { RoleBadge } from '../components/ui/RoleBadge'
 import { DemoBadge, Loading } from '../components/ui/Status'
 import { formatRelative } from '../lib/format'
 import type { District, MetaConfig, StateInfo } from '../lib/types'
@@ -88,13 +89,21 @@ function Freshness() {
 function AccountMenu() {
   const { t } = useTranslation()
   const auth = useAuthState()
-  if (!AUTH_CONFIGURED) return <span className="hidden text-sm text-road sm:inline">{t('app.devMode')}</span>
+  if (!AUTH_CONFIGURED) {
+    return (
+      <div className="flex items-center gap-3">
+        <RoleBadge role={auth.role} />
+        <span className="hidden text-sm text-road lg:inline">{t('app.devMode')}</span>
+      </div>
+    )
+  }
   if (!auth.isLoaded) return null
   if (!auth.isSignedIn) {
     return <Link to="/sign-in" className={buttonClass('secondary')}>{t('app.signIn')}</Link>
   }
   return (
     <div className="flex items-center gap-3">
+      <RoleBadge role={auth.role} />
       <Link to="/settings" className="hidden max-w-48 truncate text-sm text-road underline-offset-4 hover:underline sm:inline">{auth.email}</Link>
       <button type="button" onClick={() => void auth.signOut()} className={buttonClass('quiet', 'px-2')}>
         {t('app.signOut')}

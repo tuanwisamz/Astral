@@ -14,6 +14,7 @@ IDENTITY_COLUMNS = [
     ("incidents", "reported_by"),
     ("incident_events", "actor"),
     ("report_analyses", "clerk_id"),
+    ("capture_tokens", "clerk_id"),
     ("priority_profiles", "created_by"),
     ("zones", "created_by"),
     ("jurisdiction_overrides", "created_by"),
@@ -70,8 +71,8 @@ def test_deleting_an_account_anonymises_and_keeps_the_hazard(api, clerk_calls):
     assert clerk_calls["deleted"] == ["dev-public"]
     assert mentions("dev-public") == {}
     # The hazard is still there for officers, just without a reporter.
-    rows = asyncio.run(sql("select reported_by from incidents where ref_no = $1", ref))
-    assert len(rows) == 1 and rows[0]["reported_by"] is None
+    rows = asyncio.run(sql("select reported_by, reporter_name from incidents where ref_no = $1", ref))
+    assert len(rows) == 1 and rows[0]["reported_by"] is None and rows[0]["reporter_name"] is None
     assert c.get("/api/v1/reports/mine").json()["items"] == []
 
 

@@ -39,8 +39,8 @@ async def generate(
     session: AsyncSession | None, model: str, contents: list, schema: type[T], system: str | None = None
 ) -> T:
     config = types.GenerateContentConfig(
-        response_mime_type="application/json", response_schema=schema, temperature=0.1, system_instruction=system
-    )
+        response_mime_type="application/json", response_schema=schema, system_instruction=system
+    )  # no temperature: deprecated from Gemini 3.6 Flash on
     delay = 1.0
     for attempt in range(RETRIES):
         try:

@@ -66,6 +66,12 @@ export interface IncidentProps {
   has_photo?: boolean
   assigned_agency?: string | null
   ai_suggested?: boolean
+  /** Where a public report was made (U3b). Staff only; the name is for officers and admins only. */
+  reporter_name?: string | null
+  address?: string | null
+  landmark?: string | null
+  gps?: { lat: number; lng: number; accuracy_m: number } | null
+  captured_at?: string | null
 }
 
 export interface Feature<G, P> {

@@ -1,9 +1,11 @@
 """API tests against the PostGIS test database (see conftest.py)."""
 
 import asyncio
+import io
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from PIL import Image
 
 from app.services import sla
 from tests.conftest import sql
@@ -13,8 +15,38 @@ ON_TAMBUN = {"lat": 4.6125, "lng": 101.1250}  # on segment 2, Jalan Tambun
 KINTA_BBOX = "100.9,4.3,101.3,4.9"
 
 
+def _jpeg() -> bytes:
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 48), "grey").save(buf, format="JPEG")
+    return buf.getvalue()
+
+
+JPEG = _jpeg()
+
+
+def photo_check(client, at=ON_FT1, gps=None, accuracy=8.0, token=None):
+    """What the in-app camera does (U3): get a capture token, then send the photo with the GPS fix."""
+    token = token or client.post("/api/v1/reports/capture-start").json()["capture_token"]
+    gps = gps or at
+    return client.post(
+        "/api/v1/reports/analyze",
+        data={**at, "capture_token": token, "gps_lat": gps["lat"], "gps_lng": gps["lng"], "gps_accuracy_m": accuracy},
+        files={"photo": ("p.jpg", JPEG, "image/jpeg")},
+    )
+
+
+def analysis_id(client, at=ON_FT1) -> str:
+    res = photo_check(client, at)
+    body = res.json()
+    # Without Gemini (tests), the check falls back to manual but still keeps the photo (T4.5).
+    return body["analysis_id"] if res.status_code == 200 else body["error"]["details"]["analysis_id"]
+
+
 def report(client, hazard="POTHOLE", severity=3, at=ON_FT1, **extra):
-    return client.post("/api/v1/reports", json={"hazard_type": hazard, "severity": severity, **at, **extra})
+    if "analysis_id" not in extra:
+        extra["analysis_id"] = analysis_id(client, at)
+    body = {"hazard_type": hazard, "severity": severity, **at, "reporter_name": "Aina Test", **extra}
+    return client.post("/api/v1/reports", json=body)
 
 
 # --- basics -------------------------------------------------------------------------------
@@ -118,29 +150,104 @@ def test_report_status_only_for_its_reporter_or_staff(api):
     assert api("officer", "KUL").get(f"/api/v1/reports/{ref}").status_code == 404
 
 
-def test_analyze_falls_back_to_manual_without_ai(api, monkeypatch):
-    from app.services import storage
-
-    async def fake_upload(path, data, content_type):
-        return None
-
-    monkeypatch.setattr(storage, "upload", fake_upload)
-    import io
-
-    from PIL import Image
-
-    buf = io.BytesIO()
-    Image.new("RGB", (64, 48), "grey").save(buf, format="JPEG")
-    res = api("public").post(
-        "/api/v1/reports/analyze",
-        data={"lat": ON_FT1["lat"], "lng": ON_FT1["lng"]},
-        files={"photo": ("p.jpg", buf.getvalue(), "image/jpeg")},
-    )
+def test_analyze_falls_back_to_manual_without_ai(api):
+    res = photo_check(api("public"))
     err = res.json()["error"]
     assert res.status_code == 503 and err["code"] == "AI_UNAVAILABLE" and err["details"]["fallback"] == "manual"
     # The photo was kept, so the report can still go in with a manually chosen type (T4.5).
     sub = report(api("public"), analysis_id=err["details"]["analysis_id"])
     assert sub.status_code == 201
+
+
+# --- camera-only reports (U3) ---------------------------------------------------------------
+
+
+def test_report_needs_a_photo_check(api):
+    body = {"hazard_type": "POTHOLE", "severity": 3, **ON_FT1, "reporter_name": "Aina Test"}
+    res = api("public").post("/api/v1/reports", json=body)
+    assert res.status_code == 422 and res.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_reporter_name_is_required(api):
+    assert report(api("public"), reporter_name="   ").status_code == 422
+
+
+def test_capture_token_is_single_use_and_expires(api):
+    c = api("public")
+    token = c.post("/api/v1/reports/capture-start").json()["capture_token"]
+    assert photo_check(c, token=token).status_code == 503  # spent (AI is blanked, so it falls back to manual)
+    again = photo_check(c, token=token)
+    assert again.status_code == 422 and again.json()["error"]["code"] == "CAPTURE_EXPIRED"
+    old = c.post("/api/v1/reports/capture-start").json()["capture_token"]
+    asyncio.run(sql("update capture_tokens set issued_at = now() - interval '11 minutes' where token = $1", old))
+    assert photo_check(c, token=old).json()["error"]["code"] == "CAPTURE_EXPIRED"
+
+
+def test_capture_token_belongs_to_one_account(api):
+    token = api("officer", "A").post("/api/v1/reports/capture-start").json()["capture_token"]
+    assert photo_check(api("public"), token=token).json()["error"]["code"] == "CAPTURE_EXPIRED"
+
+
+def test_coarse_gps_is_refused_and_keeps_the_token(api):
+    c = api("public")
+    token = c.post("/api/v1/reports/capture-start").json()["capture_token"]
+    coarse = photo_check(c, accuracy=250, token=token)
+    assert coarse.status_code == 422 and coarse.json()["error"]["code"] == "GPS_TOO_COARSE"
+    assert photo_check(c, token=token).status_code == 503  # the refusal didn't spend the token
+
+
+def test_pin_must_stay_near_the_gps_fix(api):
+    c = api("public")
+    far_fix = {"lat": ON_FT1["lat"] + 0.002, "lng": ON_FT1["lng"]}  # about 220 m north
+    res = photo_check(c, gps=far_fix)
+    assert res.status_code == 422 and res.json()["error"]["code"] == "PIN_TOO_FAR"
+    assert res.json()["error"]["details"]["max_m"] == 100
+    # The pin can't be moved away after the photo check either.
+    moved = report(c, at={"lat": ON_FT1["lat"] + 0.0015, "lng": ON_FT1["lng"]}, analysis_id=analysis_id(c))
+    assert moved.status_code == 422 and moved.json()["error"]["code"] == "PIN_TOO_FAR"
+
+
+def test_reporter_details_are_stored_and_the_name_shown_to_officers_only(api):
+    ref = report(api("public"), address="Jalan Sultan Azlan Shah, Ipoh", landmark="Near the bus stop").json()["ref_no"]
+    officer = api("officer", "A")
+    inc = officer.get(f"/api/v1/incidents/{_incident_id(officer, ref)}").json()
+    assert (inc["reporter_name"], inc["landmark"]) == ("Aina Test", "Near the bus stop")
+    assert inc["address"] == "Jalan Sultan Azlan Shah, Ipoh" and inc["captured_at"]
+    assert inc["gps"]["accuracy_m"] == 8.0 and abs(inc["gps"]["lat"] - ON_FT1["lat"]) < 1e-9
+    viewer = api("viewer", "A")
+    seen = viewer.get(f"/api/v1/incidents/{_incident_id(viewer, ref)}").json()
+    assert "reporter_name" not in seen and seen["address"]
+    public = api().get("/api/v1/map/incidents", params={"bbox": KINTA_BBOX}).json()["features"][0]["properties"]
+    assert not {"reporter_name", "address", "landmark", "gps"} & set(public)
+
+
+def test_address_label_is_short_and_ordered():
+    from app.services.geocode import label
+
+    raw = {
+        "address": {"road": "Jalan Tronoh", "suburb": "Seri Iskandar", "town": "Seri Iskandar", "postcode": "32610",
+                    "state": "Perak"},
+        "display_name": "a much longer name",
+    }
+    assert label(raw) == "Jalan Tronoh, Seri Iskandar, 32610, Perak"
+    assert label({"display_name": "Somewhere"}) == "Somewhere"
+    assert label(None) is None
+
+
+def test_where_looks_up_the_address_once(api, monkeypatch):
+    from app.services import geocode
+
+    calls = []
+
+    async def fake_fetch(lat, lng):
+        calls.append((lat, lng))
+        return {"address": {"road": "Jalan Sultan Azlan Shah", "city": "Ipoh", "state": "Perak"}}
+
+    monkeypatch.setattr(geocode, "_fetch", fake_fetch)
+    c = api("public")
+    for _ in range(2):
+        assert c.get("/api/v1/reports/where", params=ON_FT1).json() == {"address": "Jalan Sultan Azlan Shah, Ipoh, Perak"}
+    assert len(calls) == 1  # the second answer came from geocode_cache
 
 
 # --- incidents (M3) -------------------------------------------------------------------------
@@ -314,14 +421,7 @@ def test_assistant_without_ai_says_so(api):
 
 def test_ai_result_is_stored_as_a_json_object(api, monkeypatch):
     """Regression: with the asyncpg JSON codec, pre-serialised strings were stored double-encoded."""
-    import io
-
-    from PIL import Image
-
-    from app.services import gemini, storage
-
-    async def fake_upload(path, data, content_type):
-        return None
+    from app.services import gemini
 
     async def fake_classify(session, image, mime):
         return gemini.PhotoAnalysis(
@@ -334,16 +434,9 @@ def test_ai_result_is_stored_as_a_json_object(api, monkeypatch):
             plates_visible=False,
         )
 
-    monkeypatch.setattr(storage, "upload", fake_upload)
     monkeypatch.setattr(gemini, "classify_photo", fake_classify)
-    buf = io.BytesIO()
-    Image.new("RGB", (64, 48), "grey").save(buf, format="JPEG")
     c = api("public")
-    analysis = c.post(
-        "/api/v1/reports/analyze",
-        data={"lat": ON_FT1["lat"], "lng": ON_FT1["lng"]},
-        files={"photo": ("p.jpg", buf.getvalue(), "image/jpeg")},
-    ).json()
+    analysis = photo_check(c).json()
     assert analysis["suggested_type"] == "POTHOLE" and analysis["ai_suggested"]
     assert report(c, severity=4, analysis_id=analysis["analysis_id"]).status_code == 201
     rows = asyncio.run(sql("select jsonb_typeof(ai_result) as t, ai_result->>'hazard_type' as h from incidents"))

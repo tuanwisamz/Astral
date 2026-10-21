@@ -23,6 +23,7 @@ RESET_TABLES = (
     "incidents",
     "accidents",
     "report_analyses",
+    "capture_tokens",
     "usage_daily",
     "predictions",
     "weather_warnings",
@@ -89,6 +90,13 @@ def api(monkeypatch, database):
     asyncio.run(_reset())
     for k, v in {**BLANK, "APP_ENV": "test", "DATABASE_URL": database}.items():
         monkeypatch.setenv(k, v)
+
+    from app.services import storage
+
+    async def no_upload(path, data, content_type):  # photo storage is Supabase: blanked out like the rest
+        return None
+
+    monkeypatch.setattr(storage, "upload", no_upload)
 
     def as_role(role: str | None = None, state: str | None = None) -> TestClient:
         monkeypatch.setenv("DEV_AUTH_ROLE", role or "")

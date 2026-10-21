@@ -14,7 +14,7 @@ from app.core.errors import ApiError
 MYT = timezone(timedelta(hours=8))
 
 # Per-user daily limits (spec-api §5).
-LIMITS = {"report": 10, "analyze": 20, "assistant": 30, "explain": 100}
+LIMITS = {"report": 10, "analyze": 20, "capture": 60, "assistant": 30, "explain": 100}
 
 TODAY = "(now() at time zone 'Asia/Kuala_Lumpur')::date"
 

@@ -55,12 +55,13 @@ async def me(user: CurrentUser = Depends(current_user), session: AsyncSession = 
 
 # Every table that stores a Clerk user ID, and what deleting the account does to it.
 ANONYMISE = [
-    "update incidents set reported_by = null where reported_by = :uid",
+    "update incidents set reported_by = null, reporter_name = null where reported_by = :uid",
     "update incident_events set actor = :deleted where actor = :uid",
     "update report_analyses set clerk_id = :deleted where clerk_id = :uid and incident_id is not null",
     "update priority_profiles set created_by = :deleted where created_by = :uid",
     "update zones set created_by = :deleted where created_by = :uid",
     "update jurisdiction_overrides set created_by = :deleted where created_by = :uid",
+    "delete from capture_tokens where clerk_id = :uid",
     "delete from usage_daily where clerk_id = :uid",
     "delete from app_users where clerk_id = :uid",
 ]

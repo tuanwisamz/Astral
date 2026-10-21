@@ -11,7 +11,10 @@
     "loading": "Loading",
     "updated": "Updated {{when}}",
     "offline": "Can't reach the server. Check your connection, then try again.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "aiUnavailable": "The AI isn't available right now. Try again in a moment.",
+    "dailyLimit": "You've reached today's limit of {{limit}}. It resets at midnight.",
+    "rateLimited": "Too many requests. Wait a moment, then try again."
   },
   "nav": {
     "main": "Main",
@@ -217,7 +220,13 @@
     "verifiedOn": "Confirmed {{date}}",
     "notVerified": "Not yet confirmed: maintenance contracts change in 2026.",
     "contact": "Contact",
-    "ruleBased": "Ownership worked out from the road type, not a route number. An officer can correct it."
+    "ruleBased": "Ownership worked out from the road type, not a route number. An officer can correct it.",
+    "reportedBy": "Reported by",
+    "reporterName": "Name",
+    "address": "Address",
+    "landmark": "Landmark",
+    "gps": "GPS at the photo",
+    "capturedAt": "Photo taken"
   },
   "roadClass": {
     "FEDERAL": "Federal road",
@@ -413,15 +422,10 @@
     "photoTitle": "Take a photo of the hazard",
     "photoBody": "One clear photo of the pothole, fallen tree or sinkhole.",
     "takePhoto": "Take photo",
-    "choosePhoto": "Choose a photo instead",
     "preparing": "Preparing photo",
     "privacyHint": "Keep people and number plates out of the photo.",
     "locationTitle": "Check the location",
-    "locationFromPhoto": "We used the location saved in your photo.",
-    "locationFromDevice": "We used your phone's location.",
-    "locationNone": "We couldn't find your location. Drag the pin to the hazard.",
     "dragPin": "Drag the pin onto the road where the hazard is.",
-    "useMyLocation": "Use my location",
     "startOver": "Start over",
     "checkPhoto": "Check photo",
     "checking": "Checking the photo",
@@ -455,8 +459,50 @@
     "another": "Report another hazard",
     "errors": {
       "NOT_ON_ROAD": "That spot is more than 50 m from a mapped road. Move the pin onto the road.",
-      "OUTSIDE_COVERAGE": "That spot is outside Peninsular Malaysia, which this service covers."
-    }
+      "OUTSIDE_COVERAGE": "That spot is outside Peninsular Malaysia, which this service covers.",
+      "PIN_TOO_FAR": "The pin is {{distance_m}} m from where you took the photo. Keep it within {{max_m}} m.",
+      "GPS_TOO_COARSE": "Your location was only accurate to {{accuracy_m}} m. Move into the open and take the photo again.",
+      "CAPTURE_EXPIRED": "This photo has expired or was already checked. Take the photo again."
+    },
+    "cameraOnlyHint": "Photos can only be taken here, with your camera, so every report shows the hazard as it is now.",
+    "camera": {
+      "preview": "Camera preview",
+      "starting": "Starting the camera",
+      "deniedTitle": "Camera access is blocked",
+      "deniedBody": "Allow camera access for this site in your browser's settings, then try again. Reports need a photo taken now.",
+      "unavailableTitle": "No camera found",
+      "unavailableBody": "Reports need a photo taken with this device's camera. Open this page on a phone with a camera.",
+      "insecureTitle": "The camera needs a secure connection",
+      "insecureBody": "Open this page with https:// to use the camera."
+    },
+    "gps": {
+      "waiting": "Finding your location. Keep location (GPS) on.",
+      "ok": "Location found, accurate to {{accuracy}} m.",
+      "coarse": "Your location is only accurate to {{accuracy}} m. Move into the open; you can take the photo once it's within {{max}} m.",
+      "denied": "Location is blocked. Allow location for this site in your browser's settings; reports need it.",
+      "unavailable": "We can't find your location. Turn on location (GPS) and wait a moment."
+    },
+    "locationFromGps": "The pin is where you took the photo (accurate to {{accuracy}} m).",
+    "dragPinWithin": "Drag the pin onto the road where the hazard is, within {{max}} m of where you took the photo.",
+    "pinClamped": "The pin can't go more than {{max}} m from where you took the photo, so it stopped at the edge.",
+    "pinToPhoto": "Back to my location",
+    "continue": "Continue",
+    "retake": "Take the photo again",
+    "address": "Address",
+    "addressLooking": "Looking up the address",
+    "addressUnknown": "Not found. You can type it on the next step.",
+    "addressHint": "Filled in from the map. Correct it if it's wrong.",
+    "yourDetails": "Your details",
+    "name": "Your name",
+    "nameHint": "Officers see it so they can follow up. It's never shown on the public map.",
+    "nameMissing": "Enter your name (at least 2 characters).",
+    "landmark": "Landmark (optional)",
+    "landmarkHint": "For example: near the UTP main gate.",
+    "reviewTitle": "Check before you send",
+    "gpsLabel": "GPS",
+    "gpsAccuracy": "(±{{accuracy}} m)",
+    "pinMoved": "Pin moved {{metres}} m from here",
+    "takenAt": "Photo taken"
   },
   "tracking": {
     "ref": "Report",
@@ -554,7 +600,8 @@
     "thinking": "Looking it up",
     "showOnMap_one": "Show {{count}} road on the map",
     "showOnMap_other": "Show {{count}} roads on the map",
-    "segment": "Segment {{id}}"
+    "segment": "Segment {{id}}",
+    "notAnswered": "Not answered"
   },
   "onboarding": {
     "skip": "Skip tour",
@@ -611,5 +658,15 @@
     "lastAdmin": "You're the only admin, so this account can't be deleted. Make someone else an admin first.",
     "notConnected": "Sign-in isn't connected in this copy of the app, so there's no account to manage.",
     "deleted": "Your account is deleted."
+  },
+  "roles": {
+    "label": "Role:",
+    "short": {
+      "admin": "Admin",
+      "officer": "Officer",
+      "viewer": "Viewer",
+      "public": "User",
+      "dev": "Dev"
+    }
   }
 }

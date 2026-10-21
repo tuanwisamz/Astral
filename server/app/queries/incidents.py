@@ -29,6 +29,7 @@ SELECT = """
     i.mitigated_at, i.resolved_at, i.sla_temp_due_at, i.sla_perm_due_at, i.is_synthetic,
     i.duplicate_of::text as duplicate_of, i.ai_result, i.confidence,
     i.assigned_agency_id::text as assigned_agency_id, aa.name as assigned_agency,
+    i.reporter_name, i.address, i.landmark, i.gps_lat, i.gps_lng, i.gps_accuracy_m, i.captured_at,
     ST_X(i.geom) as lng, ST_Y(i.geom) as lat,
     s.name as road_name, s.ref as road_ref, s.road_class, s.state_code, d.name as district,
     o.name as owner, m.name as maintainer
@@ -99,8 +100,17 @@ def view(r: dict, staff: bool, role: str = "public", now: datetime | None = None
                 "lat": r["lat"],
                 "lng": r["lng"],
                 "ai_suggested": bool(r["ai_result"]),
+                # Where the reporter stood (U3b). The public never sees these (spec-api §4.3).
+                "address": r.get("address"),
+                "landmark": r.get("landmark"),
+                "gps": None
+                if r.get("gps_lat") is None
+                else {"lat": r["gps_lat"], "lng": r["gps_lng"], "accuracy_m": r["gps_accuracy_m"]},
+                "captured_at": iso(r.get("captured_at")),
             }
         )
+        if role in ("officer", "admin"):  # viewers are outside agencies: they get the place, not the person
+            out["reporter_name"] = r.get("reporter_name")
     return out
 
 
@@ -190,6 +200,13 @@ async def create(
     reported_at: datetime | None = None,
     is_synthetic: bool = False,
     status: str = "REPORTED",
+    reporter_name: str | None = None,
+    address: str | None = None,
+    landmark: str | None = None,
+    gps_lat: float | None = None,
+    gps_lng: float | None = None,
+    gps_accuracy_m: float | None = None,
+    captured_at: datetime | None = None,
 ) -> dict:
     reported_at = reported_at or datetime.now(UTC)
     temp_due, perm_due = sla.deadlines(segment["road_class"], reported_at)
@@ -198,11 +215,13 @@ async def create(
         """
         insert into incidents (ref_no, hazard_type, severity, status, source, source_url, confidence, ai_result,
                                description, photo_path, segment_id, reported_by, reported_at, sla_temp_due_at,
-                               sla_perm_due_at, is_synthetic, geom)
+                               sla_perm_due_at, is_synthetic, reporter_name, address, landmark, gps_lat, gps_lng,
+                               gps_accuracy_m, captured_at, geom)
         values ('SAR-' || to_char(:reported_at at time zone 'Asia/Kuala_Lumpur', 'YYYY') || '-'
                     || lpad(nextval('incident_ref_seq')::text, 6, '0'),
                 :hazard, :severity, :status, :source, :source_url, :confidence, cast(:ai_result as jsonb),
                 :description, :photo_path, :segment_id, :actor, :reported_at, :temp_due, :perm_due, :synthetic,
+                :reporter_name, :address, :landmark, :gps_lat, :gps_lng, :gps_accuracy_m, :captured_at,
                 ST_SetSRID(ST_Point(:lng, :lat), 4326))
         returning id::text as id, ref_no""",
         hazard=hazard_type,
@@ -220,6 +239,13 @@ async def create(
         temp_due=temp_due,
         perm_due=perm_due,
         synthetic=is_synthetic,
+        reporter_name=reporter_name,
+        address=address,
+        landmark=landmark,
+        gps_lat=gps_lat,
+        gps_lng=gps_lng,
+        gps_accuracy_m=gps_accuracy_m,
+        captured_at=captured_at,
         lat=lat,
         lng=lng,
     )

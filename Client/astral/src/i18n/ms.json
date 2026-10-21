@@ -11,7 +11,10 @@
     "loading": "Memuatkan",
     "updated": "Dikemas kini {{when}}",
     "offline": "Tidak dapat menghubungi pelayan. Semak sambungan anda, kemudian cuba lagi.",
-    "retry": "Cuba lagi"
+    "retry": "Cuba lagi",
+    "aiUnavailable": "AI tidak tersedia sekarang. Cuba lagi sebentar lagi.",
+    "dailyLimit": "Anda telah mencapai had hari ini, iaitu {{limit}}. Had ditetapkan semula pada tengah malam.",
+    "rateLimited": "Terlalu banyak permintaan. Tunggu sebentar, kemudian cuba lagi."
   },
   "nav": {
     "main": "Utama",
@@ -217,7 +220,13 @@
     "verifiedOn": "Disahkan {{date}}",
     "notVerified": "Belum disahkan: kontrak penyelenggaraan berubah pada 2026.",
     "contact": "Hubungi",
-    "ruleBased": "Pemilikan ditentukan daripada jenis jalan, bukan nombor laluan. Pegawai boleh membetulkannya."
+    "ruleBased": "Pemilikan ditentukan daripada jenis jalan, bukan nombor laluan. Pegawai boleh membetulkannya.",
+    "reportedBy": "Dilaporkan oleh",
+    "reporterName": "Nama",
+    "address": "Alamat",
+    "landmark": "Mercu tanda",
+    "gps": "GPS semasa bergambar",
+    "capturedAt": "Gambar diambil"
   },
   "roadClass": {
     "FEDERAL": "Jalan persekutuan",
@@ -385,15 +394,10 @@
     "photoTitle": "Ambil gambar bahaya",
     "photoBody": "Satu gambar jelas lubang jalan, pokok tumbang atau lubang benam.",
     "takePhoto": "Ambil gambar",
-    "choosePhoto": "Pilih gambar sedia ada",
     "preparing": "Menyediakan gambar",
     "privacyHint": "Elakkan orang dan nombor plat dalam gambar.",
     "locationTitle": "Semak lokasi",
-    "locationFromPhoto": "Kami menggunakan lokasi yang disimpan dalam gambar anda.",
-    "locationFromDevice": "Kami menggunakan lokasi telefon anda.",
-    "locationNone": "Kami tidak dapat mencari lokasi anda. Seret pin ke tempat bahaya.",
     "dragPin": "Seret pin ke atas jalan di tempat bahaya.",
-    "useMyLocation": "Guna lokasi saya",
     "startOver": "Mula semula",
     "checkPhoto": "Semak gambar",
     "checking": "Menyemak gambar",
@@ -427,8 +431,50 @@
     "another": "Laporkan bahaya lain",
     "errors": {
       "NOT_ON_ROAD": "Titik itu lebih 50 m dari jalan dalam peta. Alihkan pin ke atas jalan.",
-      "OUTSIDE_COVERAGE": "Titik itu di luar Semenanjung Malaysia, kawasan yang diliputi perkhidmatan ini."
-    }
+      "OUTSIDE_COVERAGE": "Titik itu di luar Semenanjung Malaysia, kawasan yang diliputi perkhidmatan ini.",
+      "PIN_TOO_FAR": "Pin berada {{distance_m}} m dari tempat anda mengambil gambar. Pastikan dalam lingkungan {{max_m}} m.",
+      "GPS_TOO_COARSE": "Lokasi anda hanya tepat hingga {{accuracy_m}} m. Pergi ke kawasan terbuka dan ambil gambar semula.",
+      "CAPTURE_EXPIRED": "Gambar ini telah tamat tempoh atau sudah disemak. Ambil gambar semula."
+    },
+    "cameraOnlyHint": "Gambar hanya boleh diambil di sini dengan kamera anda, supaya setiap laporan menunjukkan keadaan bahaya sekarang.",
+    "camera": {
+      "preview": "Pratonton kamera",
+      "starting": "Membuka kamera",
+      "deniedTitle": "Akses kamera disekat",
+      "deniedBody": "Benarkan akses kamera untuk laman ini dalam tetapan pelayar anda, kemudian cuba lagi. Laporan memerlukan gambar yang diambil sekarang.",
+      "unavailableTitle": "Tiada kamera ditemui",
+      "unavailableBody": "Laporan memerlukan gambar yang diambil dengan kamera peranti ini. Buka halaman ini pada telefon yang mempunyai kamera.",
+      "insecureTitle": "Kamera memerlukan sambungan selamat",
+      "insecureBody": "Buka halaman ini dengan https:// untuk menggunakan kamera."
+    },
+    "gps": {
+      "waiting": "Mencari lokasi anda. Pastikan lokasi (GPS) dihidupkan.",
+      "ok": "Lokasi ditemui, tepat hingga {{accuracy}} m.",
+      "coarse": "Lokasi anda hanya tepat hingga {{accuracy}} m. Pergi ke kawasan terbuka; anda boleh mengambil gambar apabila ketepatannya dalam {{max}} m.",
+      "denied": "Lokasi disekat. Benarkan lokasi untuk laman ini dalam tetapan pelayar anda; laporan memerlukannya.",
+      "unavailable": "Kami tidak dapat mencari lokasi anda. Hidupkan lokasi (GPS) dan tunggu sebentar."
+    },
+    "locationFromGps": "Pin berada di tempat anda mengambil gambar (tepat hingga {{accuracy}} m).",
+    "dragPinWithin": "Seret pin ke atas jalan di tempat bahaya, dalam lingkungan {{max}} m dari tempat anda mengambil gambar.",
+    "pinClamped": "Pin tidak boleh lebih {{max}} m dari tempat anda mengambil gambar, jadi ia berhenti di tepi bulatan.",
+    "pinToPhoto": "Kembali ke lokasi saya",
+    "continue": "Teruskan",
+    "retake": "Ambil gambar semula",
+    "address": "Alamat",
+    "addressLooking": "Mencari alamat",
+    "addressUnknown": "Tidak ditemui. Anda boleh menaipnya pada langkah seterusnya.",
+    "addressHint": "Diisi daripada peta. Betulkan jika salah.",
+    "yourDetails": "Butiran anda",
+    "name": "Nama anda",
+    "nameHint": "Pegawai melihatnya supaya boleh membuat susulan. Ia tidak dipaparkan pada peta awam.",
+    "nameMissing": "Masukkan nama anda (sekurang-kurangnya 2 aksara).",
+    "landmark": "Mercu tanda (pilihan)",
+    "landmarkHint": "Contohnya: dekat pintu utama UTP.",
+    "reviewTitle": "Semak sebelum menghantar",
+    "gpsLabel": "GPS",
+    "gpsAccuracy": "(±{{accuracy}} m)",
+    "pinMoved": "Pin dialihkan {{metres}} m dari sini",
+    "takenAt": "Gambar diambil"
   },
   "tracking": {
     "ref": "Laporan",
@@ -526,7 +572,8 @@
     "thinking": "Sedang mencari",
     "showOnMap_one": "Papar {{count}} jalan pada peta",
     "showOnMap_other": "Papar {{count}} jalan pada peta",
-    "segment": "Segmen {{id}}"
+    "segment": "Segmen {{id}}",
+    "notAnswered": "Belum dijawab"
   },
   "onboarding": {
     "skip": "Langkau",
@@ -611,5 +658,15 @@
     "lastAdmin": "Anda satu-satunya pentadbir, jadi akaun ini tidak boleh dipadam. Jadikan orang lain pentadbir dahulu.",
     "notConnected": "Log masuk tidak disambungkan dalam salinan aplikasi ini, jadi tiada akaun untuk diurus.",
     "deleted": "Akaun anda telah dipadam."
+  },
+  "roles": {
+    "label": "Peranan:",
+    "short": {
+      "admin": "Pentadbir",
+      "officer": "Pegawai",
+      "viewer": "Pemerhati",
+      "public": "Pengguna",
+      "dev": "Dev"
+    }
   }
 }

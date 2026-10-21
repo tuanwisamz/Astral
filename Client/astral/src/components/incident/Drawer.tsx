@@ -6,7 +6,7 @@ import { Link } from 'react-router'
 import { useApi } from '../../app/auth'
 import i18n from '../../i18n'
 import { factorLabel } from '../../lib/factors'
-import { formatDate, formatRelative } from '../../lib/format'
+import { formatDate, formatDateTime, formatRelative } from '../../lib/format'
 import type { IncidentStatus } from '../../lib/hazards'
 import type { Agency, IncidentProps, LocateResult, PredictionProps, RoadClass, SegmentProps } from '../../lib/types'
 import { Button, buttonClass } from '../ui/Button'
@@ -88,6 +88,32 @@ function OfficerTools({ inc, onChanged }: { inc: IncidentProps; onChanged: (data
   )
 }
 
+/** Who reported it and where they stood (U3b). The API leaves the name out for viewers. */
+function ReportedBy({ inc }: { inc: IncidentProps }) {
+  const { t } = useTranslation()
+  const gps = inc.gps
+  return (
+    <section className="mt-6">
+      <h3 className="mb-1 font-semibold">{t('drawer.reportedBy')}</h3>
+      <dl>
+        {inc.reporter_name && <Row label={t('drawer.reporterName')}>{inc.reporter_name}</Row>}
+        {inc.address && <Row label={t('drawer.address')}>{inc.address}</Row>}
+        {inc.landmark && <Row label={t('drawer.landmark')}>{inc.landmark}</Row>}
+        {gps && (
+          <Row label={t('drawer.gps')}>
+            <a href={`https://www.openstreetmap.org/?mlat=${gps.lat}&mlon=${gps.lng}#map=19/${gps.lat}/${gps.lng}`}
+              target="_blank" rel="noreferrer" className="tabular underline">
+              {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
+            </a>{' '}
+            <span className="text-road">{t('report.gpsAccuracy', { accuracy: Math.round(gps.accuracy_m) })}</span>
+          </Row>
+        )}
+        {inc.captured_at && <Row label={t('drawer.capturedAt')}>{formatDateTime(inc.captured_at)}</Row>}
+      </dl>
+    </section>
+  )
+}
+
 function IncidentDetail({ props, staff, canEdit }: { props: IncidentProps; staff: boolean; canEdit: boolean }) {
   const { t } = useTranslation()
   const api = useApi()
@@ -140,6 +166,7 @@ function IncidentDetail({ props, staff, canEdit }: { props: IncidentProps; staff
         {inc.description && <Row label={t('drawer.description')}>{inc.description}</Row>}
         {inc.source_url && <Row label={t('drawer.source')}><a href={inc.source_url} target="_blank" rel="noreferrer" className="underline">{t('drawer.newsLink')}</a></Row>}
       </dl>
+      {staff && (inc.reporter_name || inc.address || inc.gps) && <ReportedBy inc={inc} />}
       {staff && (
         <section className="mt-6">
           <h3 className="mb-3 font-semibold">{t('drawer.actions')}</h3>

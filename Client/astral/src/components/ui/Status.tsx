@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { ApiError } from '../../lib/api'
+import { ApiError, errorVars } from '../../lib/api'
 import { Button } from './Button'
 
 export function Loading() {
@@ -21,15 +21,24 @@ const CODE_MESSAGES: Record<string, string> = {
   UNAUTHENTICATED: 'access.signInAgain',
   FORBIDDEN: 'access.forbidden',
   OUT_OF_SCOPE: 'access.outOfScope',
+  AI_UNAVAILABLE: 'app.aiUnavailable',
+  DAILY_LIMIT: 'app.dailyLimit',
+  RATE_LIMITED: 'app.rateLimited',
+  NOT_ON_ROAD: 'report.errors.NOT_ON_ROAD',
+  OUTSIDE_COVERAGE: 'report.errors.OUTSIDE_COVERAGE',
+  PIN_TOO_FAR: 'report.errors.PIN_TOO_FAR',
+  GPS_TOO_COARSE: 'report.errors.GPS_TOO_COARSE',
+  CAPTURE_EXPIRED: 'report.errors.CAPTURE_EXPIRED',
 }
 
 export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const { t } = useTranslation()
   const api = error instanceof ApiError ? error : null
   const key = api && CODE_MESSAGES[api.code]
-  const message = key ? t(key) : api ? api.message : String(error)
-  // Retrying only helps when the server or the connection failed, not when access was refused.
-  const retryable = !api || api.status === 0 || api.status >= 500
+  const message = api && key ? t(key, errorVars(api)) : api ? api.message : String(error)
+  // Retrying only helps when the server or the connection failed, or after a per-minute limit,
+  // not when access was refused or today's limit is used up.
+  const retryable = !api || api.status === 0 || api.status >= 500 || api.code === 'RATE_LIMITED'
   return (
     <div role="alert" className="border-l-4 border-overdue bg-kerb p-4 text-sm">
       <p>{message}</p>

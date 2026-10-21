@@ -44,6 +44,7 @@ async def cleanup(session: AsyncSession) -> JobResult:
         text(f"delete from traffic_snapshots where ts < now() - interval '{SNAPSHOT_RETENTION_DAYS} days'")
     )
     await session.execute(text("delete from usage_daily where day < current_date - 60"))
+    await session.execute(text("delete from capture_tokens where issued_at < now() - interval '1 day'"))  # U3a
     await session.commit()
     return JobResult(items=len(stale))
 

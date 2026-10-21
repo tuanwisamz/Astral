@@ -5,7 +5,9 @@ number it wasn't given and falls back to a template; the assistant uses read-onl
 most five calls per question, cites segment IDs, and every answer is labelled AI-suggested.
 """
 
+import asyncio
 import json
+import logging
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -29,8 +31,11 @@ from app.queries import segments
 from app.services import gemini, scope, usage
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+log = logging.getLogger(__name__)
 
 MAX_TOOL_CALLS = 5
+RETRYABLE = (429, 500, 503, 504)
+RETRIES = 3
 NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 
 
@@ -315,6 +320,30 @@ def _segment_ids(value: Any) -> set[int]:
     return found
 
 
+async def _generate(session: AsyncSession, model: str, contents: list, config: types.GenerateContentConfig):
+    """One model turn, retried with backoff on rate limits and server errors (like gemini.generate)."""
+    delay = 1.0
+    for attempt in range(RETRIES):
+        try:
+            resp = await gemini.client().aio.models.generate_content(model=model, contents=contents, config=config)
+            await usage.bump(session, "gemini")
+            return resp
+        except genai_errors.APIError as exc:
+            code = getattr(exc, "code", None)
+            # Logged so a failing key or request shows up in the server log, not just "unavailable" (U1).
+            log.warning("Assistant: Gemini %s failed (attempt %d): %s %s", model, attempt + 1, code, exc)
+            if code not in RETRYABLE or attempt == RETRIES - 1:
+                raise
+            await asyncio.sleep(delay)
+            delay *= 3
+    raise AssertionError("unreachable")
+
+
+def _tool_reply(call: types.FunctionCall, result: dict) -> types.Part:
+    """Gemini 3.6+ needs each function response to carry the call's id and name (U1)."""
+    return types.Part(function_response=types.FunctionResponse(id=call.id, name=call.name, response={"result": result}))
+
+
 @router.post("/assistant")
 async def assistant(
     body: AssistantIn, user: CurrentUser = Depends(require_role(*STAFF)), session: AsyncSession = Depends(get_session)
@@ -327,10 +356,10 @@ async def assistant(
         contents.append(types.Content(role=role, parts=[types.Part(text=str(turn.get("content", ""))[:1500])]))
     lang = " Reply in Bahasa Melayu." if body.language == "ms" else ""
     contents.append(types.Content(role="user", parts=[types.Part(text=body.message + lang)]))
+    # No temperature: it's deprecated from Gemini 3.6 Flash on (ignored now, an error later).
     config = types.GenerateContentConfig(
         tools=TOOLS,
         system_instruction=SYSTEM,
-        temperature=0.2,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
     calls_made: list[dict] = []
@@ -338,24 +367,29 @@ async def assistant(
     model = get_settings().gemini_model_vision
     try:
         for _ in range(MAX_TOOL_CALLS + 1):
-            resp = await gemini.client().aio.models.generate_content(model=model, contents=contents, config=config)
-            await usage.bump(session, "gemini")
+            resp = await _generate(session, model, contents, config)
             calls = resp.function_calls or []
-            if not calls or len(calls_made) >= MAX_TOOL_CALLS:
-                answer = (resp.text or "").strip()
+            if not calls or len(calls_made) >= MAX_TOOL_CALLS or not resp.candidates:
+                answer = (resp.text or "").strip() if resp.candidates else ""
                 break
-            contents.append(resp.candidates[0].content)
+            contents.append(resp.candidates[0].content)  # keeps Gemini 3's thought signatures
             parts = []
             for call in calls[: MAX_TOOL_CALLS - len(calls_made)]:
                 args = dict(call.args or {})
-                result = await _run_tool(session, user, sc, call.name, args)
+                try:
+                    result = await _run_tool(session, user, sc, call.name, args)
+                except (ApiError, KeyError, TypeError, ValueError) as exc:
+                    # An unknown or out-of-scope road goes back to the model as a result, not to the user as an outage.
+                    result = {"error": exc.message if isinstance(exc, ApiError) else f"bad arguments for {call.name}"}
                 cited |= _segment_ids(result)
                 calls_made.append({"tool": call.name, "args": args})
-                parts.append(types.Part.from_function_response(name=call.name, response={"result": result}))
+                parts.append(_tool_reply(call, result))
             contents.append(types.Content(role="tool", parts=parts))
         else:
             answer = ""
     except (genai_errors.APIError, ApiError) as exc:
+        if isinstance(exc, ApiError):
+            log.warning("Assistant unavailable: %s", exc.message)
         await session.commit()
         raise ApiError(503, "AI_UNAVAILABLE", "The assistant isn't available right now. Try again shortly.") from exc
     await session.commit()

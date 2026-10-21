@@ -21,9 +21,13 @@ export interface AuthState {
   /** 'dev' only in local development without Clerk: every page is reachable. */
   role: Role | 'dev'
   email: string | null
+  /** Name for hazard reports: the one last used to report, else the account's full name (U3b). */
+  name: string | null
   signOut: (redirectUrl?: string) => Promise<void>
   /** Saves the language to the account so it follows the person to other devices (plan A3). */
   saveLanguage: (lang: string) => Promise<void>
+  /** Saves the name used on a hazard report, so the next report is already filled in (U3b). */
+  saveReporterName: (name: string) => Promise<void>
 }
 
 const DEV_STATE: AuthState = {
@@ -32,8 +36,10 @@ const DEV_STATE: AuthState = {
   isSignedIn: false,
   role: import.meta.env.DEV ? 'dev' : 'public',
   email: null,
+  name: null,
   signOut: async () => {},
   saveLanguage: async () => {},
+  saveReporterName: async () => {},
 }
 
 const noToken: TokenGetter = async () => null
@@ -56,11 +62,25 @@ function ClerkBridge({ children }: { children: ReactNode }) {
     queryClient.clear() // nothing from the last account stays on screen
   }, [clerk, queryClient])
 
+  // A role an admin just changed shows up when the person comes back to the tab (U2).
+  useEffect(() => {
+    if (!user) return
+    const refresh = () => { void user.reload().catch(() => {}) }
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [user])
+
   const { i18n } = useTranslation()
   const savedLang = user?.unsafeMetadata?.lang as string | undefined
   const saveLanguage = useCallback(async (lang: string) => {
     if (user && savedLang !== lang) await user.update({ unsafeMetadata: { ...user.unsafeMetadata, lang } })
   }, [user, savedLang])
+  const savedName = user?.unsafeMetadata?.reporterName as string | undefined
+  const saveReporterName = useCallback(async (reporterName: string) => {
+    if (user && savedName !== reporterName) {
+      await user.update({ unsafeMetadata: { ...user.unsafeMetadata, reporterName } })
+    }
+  }, [user, savedName])
   // On sign-in, the account's language wins over this browser's.
   useEffect(() => {
     if (savedLang && savedLang !== i18n.language) {
@@ -82,10 +102,12 @@ function ClerkBridge({ children }: { children: ReactNode }) {
       isSignedIn: Boolean(isSignedIn),
       role: metaRole && (['public', ...STAFF] as string[]).includes(metaRole) ? metaRole : 'public',
       email: user?.primaryEmailAddress?.emailAddress ?? null,
+      name: savedName || user?.fullName || null,
       signOut,
       saveLanguage,
+      saveReporterName,
     }),
-    [isLoaded, isSignedIn, metaRole, user, signOut, saveLanguage],
+    [isLoaded, isSignedIn, metaRole, user, savedName, signOut, saveLanguage, saveReporterName],
   )
 
   return (

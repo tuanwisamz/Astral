@@ -19,7 +19,17 @@ interface Turn {
   content: string
   segments?: number[]
   disclaimer?: string
+  /** A question whose answer failed. It stays on screen but isn't sent as history (U1). */
+  failed?: boolean
 }
+
+interface Question {
+  message: string
+  history: Turn[]
+}
+
+const asHistory = (turns: Turn[]) =>
+  turns.filter((turn) => !turn.failed).slice(-6).map(({ role, content }) => ({ role, content }))
 
 /** Decision Assistant (T7.3): plain-language questions, answers cite roads you can see on the map. */
 export default function Assistant() {
@@ -29,19 +39,29 @@ export default function Assistant() {
   const [draft, setDraft] = useState('')
   const end = useRef<HTMLDivElement>(null)
   const ask = useMutation({
-    mutationFn: (message: string) => api<Answer>('/ai/assistant', {
+    mutationFn: ({ message, history }: Question) => api<Answer>('/ai/assistant', {
       method: 'POST',
-      body: { message, history: turns.slice(-6).map(({ role, content }) => ({ role, content })), language: i18n.language === 'ms' ? 'ms' : 'en' },
+      body: { message, history: asHistory(history), language: i18n.language === 'ms' ? 'ms' : 'en' },
     }),
     onSuccess: (a) => setTurns((ts) => [...ts, { role: 'assistant', content: a.answer, segments: a.segments, disclaimer: a.disclaimer }]),
+    // The question stays where it was, marked unanswered, so Try again can resend it.
+    onError: () => setTurns((ts) => ts.map((turn, i) => (i === ts.length - 1 && turn.role === 'user' ? { ...turn, failed: true } : turn))),
   })
-  useEffect(() => { end.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, ask.isPending])
+  useEffect(() => { end.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }) }, [turns, ask.isPending, ask.isError])
 
   function send(message: string) {
-    if (!message.trim() || ask.isPending) return
-    setTurns((ts) => [...ts, { role: 'user', content: message.trim() }])
+    const text = message.trim()
+    if (!text || ask.isPending) return
+    ask.mutate({ message: text, history: turns })
+    setTurns((ts) => [...ts, { role: 'user', content: text }])
     setDraft('')
-    ask.mutate(message.trim())
+  }
+
+  function retry() {
+    const last = turns[turns.length - 1]
+    if (!last || last.role !== 'user' || ask.isPending) return
+    ask.mutate({ message: last.content, history: turns.slice(0, -1) })
+    setTurns((ts) => ts.map((turn, i) => (i === ts.length - 1 ? { ...turn, failed: false } : turn)))
   }
   const submit = (e: FormEvent) => { e.preventDefault(); send(draft) }
   const examples = [t('assistant.example1'), t('assistant.example2'), t('assistant.example3')]
@@ -64,6 +84,7 @@ export default function Assistant() {
         {turns.map((turn, i) => (
           <div key={i} className={turn.role === 'user' ? 'ml-auto max-w-[85%] rounded bg-asphalt px-4 py-3 text-kerb' : 'max-w-[95%] border-l-4 border-marking bg-kerb px-4 py-3'}>
             <p className="whitespace-pre-wrap">{turn.content}</p>
+            {turn.failed && <p className="mt-1 text-xs text-kerb/80">{t('assistant.notAnswered')}</p>}
             {turn.segments && turn.segments.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link to={`/map?highlight=${turn.segments.join(',')}`} className={buttonClass('secondary', 'min-h-10 text-sm')}>{t('assistant.showOnMap', { count: turn.segments.length })}</Link>
@@ -76,7 +97,7 @@ export default function Assistant() {
           </div>
         ))}
         {ask.isPending && <p className="text-road">{t('assistant.thinking')}</p>}
-        {ask.isError && <ErrorBox error={ask.error} />}
+        {ask.isError && <ErrorBox error={ask.error} onRetry={retry} />}
         <div ref={end} />
       </div>
       <form onSubmit={submit} className="mt-4 flex gap-2 border-t border-hairline pt-4">

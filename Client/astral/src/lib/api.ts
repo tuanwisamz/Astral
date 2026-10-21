@@ -15,6 +15,12 @@ export class ApiError extends Error {
   }
 }
 
+/** Numbers an error message may mention, taken from the error's details (limits, distances). */
+export function errorVars(err: ApiError) {
+  const num = (key: string) => (typeof err.details[key] === 'number' ? (err.details[key] as number) : undefined)
+  return { limit: num('limit'), distance_m: num('distance_m'), max_m: num('max_m'), accuracy_m: num('accuracy_m') }
+}
+
 export type TokenGetter = () => Promise<string | null>
 
 type Params = Record<string, string | number | boolean | undefined | null>
