@@ -24,6 +24,11 @@ CAPTURE_TTL = timedelta(minutes=10)  # a photo must be checked within this long 
 MAX_GPS_ACCURACY_M = 100  # coarser fixes are refused: move into the open and try again
 MAX_PIN_SHIFT_M = 100  # how far the pin may be dragged from the phone's GPS fix
 
+# Someone is a reporter of incident i if they filed it, or if their report was merged into it as a
+# duplicate (FR-REP-03): the merge links their photo check to i. Either way they can track it (FR-REP-04).
+IS_REPORTER_SQL = """(i.reported_by = :uid or exists (
+    select 1 from report_analyses ra where ra.incident_id = i.id and ra.clerk_id = :uid))"""
+
 
 class ReportIn(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -82,6 +87,17 @@ async def _spend_capture_token(session: AsyncSession, token: str, clerk_id: str)
     )
     if spent is None:
         raise ApiError(422, "CAPTURE_EXPIRED", "That photo has expired or was already checked. Take the photo again.")
+
+
+async def _is_reporter(session: AsyncSession, incident_id: str, clerk_id: str) -> bool:
+    return bool(
+        await db.scalar(
+            session,
+            f"select exists(select 1 from incidents i where i.id = cast(:id as uuid) and {IS_REPORTER_SQL})",
+            id=incident_id,
+            uid=clerk_id,
+        )
+    )
 
 
 @router.post("/capture-start", status_code=201)
@@ -214,7 +230,12 @@ async def submit(
 
     dup = await incidents.find_duplicate(session, body.hazard_type, body.lat, body.lng)
     if dup:
-        count = await incidents.confirm(session, dup, user.clerk_id)
+        # One person reporting the same hazard again is still linked (they can track it) but isn't
+        # another confirmation: "N others reported this" counts people, not repeat reports.
+        if await _is_reporter(session, dup["id"], user.clerk_id):
+            count = int(dup["confirmations"])
+        else:
+            count = await incidents.confirm(session, dup, user.clerk_id)
         await db.rows(
             session,
             "update report_analyses set incident_id = cast(:inc as uuid) where id = :id returning id",
@@ -289,7 +310,7 @@ async def mine(
         session,
         f"""
         select {incidents.SELECT}, count(*) over () as total {incidents.FROM}
-        where i.reported_by = :uid order by i.reported_at desc limit 50 offset :off""",
+        where {IS_REPORTER_SQL} order by i.reported_at desc limit 50 offset :off""",
         uid=user.clerk_id,
         off=(page - 1) * 50,
     )
@@ -325,7 +346,7 @@ async def mine(
 async def status(ref_no: str, user: CurrentUser = Depends(current_user), session: AsyncSession = Depends(get_session)):
     """Status tracking (FR-REP-04): the reporter sees their own report; staff see reports in their area."""
     inc = await incidents.by_ref(session, ref_no)
-    allowed = inc is not None and inc["reported_by"] == user.clerk_id
+    allowed = inc is not None and await _is_reporter(session, inc["id"], user.clerk_id)
     if inc is not None and not allowed and user.is_staff:
         sc = await scope.for_user(session, user)
         allowed = bool(

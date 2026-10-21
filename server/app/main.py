@@ -9,6 +9,7 @@ from app.core import db
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
 from app.core.ratelimit import RateLimitMiddleware
+from app.core.unhandled import UnhandledErrorMiddleware
 
 log = logging.getLogger(__name__)
 
@@ -24,7 +25,10 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Smart Analysis Road API", version="0.2.0", lifespan=lifespan)
 
+# Last added runs first: CORS -> UnhandledError -> RateLimit -> routes. UnhandledError must sit
+# inside CORS so a 500 still carries the CORS headers the browser needs to read it.
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(UnhandledErrorMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origins,

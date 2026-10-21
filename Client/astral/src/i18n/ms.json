@@ -11,6 +11,7 @@
     "loading": "Memuatkan",
     "updated": "Dikemas kini {{when}}",
     "offline": "Tidak dapat menghubungi pelayan. Semak sambungan anda, kemudian cuba lagi.",
+    "serverError": "Berlaku masalah di pihak kami. Cuba lagi sebentar lagi.",
     "retry": "Cuba lagi",
     "aiUnavailable": "AI tidak tersedia sekarang. Cuba lagi sebentar lagi.",
     "dailyLimit": "Anda telah mencapai had hari ini, iaitu {{limit}}. Had ditetapkan semula pada tengah malam.",

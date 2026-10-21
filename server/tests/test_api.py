@@ -24,15 +24,23 @@ def _jpeg() -> bytes:
 JPEG = _jpeg()
 
 
-def photo_check(client, at=ON_FT1, gps=None, accuracy=8.0, token=None):
+def photo_check(client, at=ON_FT1, gps=None, accuracy=8.0, token=None, photo=None, headers=None):
     """What the in-app camera does (U3): get a capture token, then send the photo with the GPS fix."""
     token = token or client.post("/api/v1/reports/capture-start").json()["capture_token"]
     gps = gps or at
     return client.post(
         "/api/v1/reports/analyze",
         data={**at, "capture_token": token, "gps_lat": gps["lat"], "gps_lng": gps["lng"], "gps_accuracy_m": accuracy},
-        files={"photo": ("p.jpg", JPEG, "image/jpeg")},
+        files={"photo": photo or ("p.jpg", JPEG, "image/jpeg")},
+        headers=headers,
     )
+
+
+def _blank_png(side: int) -> tuple[str, bytes, str]:
+    """A 1-bit PNG: tiny on disk however large the canvas it declares."""
+    buf = io.BytesIO()
+    Image.new("1", (side, side)).save(buf, format="PNG", optimize=True)
+    return ("p.png", buf.getvalue(), "image/png")
 
 
 def analysis_id(client, at=ON_FT1) -> str:
@@ -125,13 +133,39 @@ def test_report_creates_incident_with_sla(api):
     assert timedelta(hours=23) < due - datetime.now(UTC) < timedelta(hours=25)  # federal: 24 h
 
 
+NEAR_FT1 = {"lat": ON_FT1["lat"] + 0.0001, "lng": ON_FT1["lng"]}  # about 11 m away
+
+
 def test_nearby_same_hazard_is_merged(api):
     c = api("public")
     first = report(c).json()
-    second = report(c, at={"lat": ON_FT1["lat"] + 0.0001, "lng": ON_FT1["lng"]})
+    # A Kuala Lumpur officer stands in for a second member of the public: out of scope for Perak,
+    # so anything they can see here comes from being a reporter, not from staff access.
+    second = report(api("officer", "KUL"), at=NEAR_FT1)
     assert second.status_code == 200 and second.json()["merged_into"] == first["ref_no"]
     assert second.json()["confirmations"] == 2
     assert report(c, hazard="SINKHOLE").status_code == 201  # another hazard type isn't a duplicate
+
+
+def test_same_person_reporting_again_is_not_another_confirmation(api):
+    c = api("public")
+    first = report(c).json()
+    again = report(c, at=NEAR_FT1).json()
+    assert again["merged_into"] == first["ref_no"] and again["confirmations"] == 1
+    other = report(api("officer", "KUL"), at=NEAR_FT1).json()
+    assert other["confirmations"] == 2
+    assert report(api("officer", "KUL"), at=NEAR_FT1).json()["confirmations"] == 2  # they repeat: still 2
+
+
+def test_merged_reporter_can_track_the_report(api):
+    ref = report(api("public")).json()["ref_no"]
+    second = api("officer", "KUL")
+    assert second.get(f"/api/v1/reports/{ref}").status_code == 404  # not theirs yet
+    assert report(second, at=NEAR_FT1).json()["merged_into"] == ref
+    status = second.get(f"/api/v1/reports/{ref}")
+    assert status.status_code == 200 and status.json()["confirmations"] == 2
+    assert [i["ref_no"] for i in second.get("/api/v1/reports/mine").json()["items"]] == [ref]
+    assert api("viewer").get(f"/api/v1/reports/{ref}").status_code == 404  # still nobody else's
 
 
 def test_daily_report_limit(api):
@@ -194,6 +228,31 @@ def test_coarse_gps_is_refused_and_keeps_the_token(api):
     coarse = photo_check(c, accuracy=250, token=token)
     assert coarse.status_code == 422 and coarse.json()["error"]["code"] == "GPS_TOO_COARSE"
     assert photo_check(c, token=token).status_code == 503  # the refusal didn't spend the token
+
+
+def test_decompression_bomb_is_refused_not_a_crash(api):
+    c = api("public")
+    token = c.post("/api/v1/reports/capture-start").json()["capture_token"]
+    res = photo_check(c, token=token, photo=_blank_png(20_000))  # 400 MP: Pillow's own hard limit
+    assert res.status_code == 422 and res.json()["error"]["details"]["max_pixels"] == 40_000_000
+    assert photo_check(c, token=token).status_code == 503  # the refusal didn't spend the token
+
+
+def test_huge_canvas_under_pillows_limit_is_refused(api):
+    res = photo_check(api("public"), photo=_blank_png(12_000))  # 144 MP: Pillow only warns, ~300 MB to decode
+    assert res.status_code == 422 and res.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_unexpected_error_is_json_the_browser_can_read(api, monkeypatch):
+    from app.services import photos
+
+    def broken(_data):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(photos, "clean", broken)
+    res = photo_check(api("public"), headers={"Origin": "http://localhost:5173"})
+    assert res.status_code == 500 and res.json()["error"]["code"] == "INTERNAL_ERROR"
+    assert res.headers["access-control-allow-origin"] == "http://localhost:5173"  # else the app reads it as offline
 
 
 def test_pin_must_stay_near_the_gps_fix(api):

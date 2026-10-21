@@ -11,6 +11,7 @@
     "loading": "Loading",
     "updated": "Updated {{when}}",
     "offline": "Can't reach the server. Check your connection, then try again.",
+    "serverError": "Something went wrong on our side. Try again in a moment.",
     "retry": "Try again",
     "aiUnavailable": "The AI isn't available right now. Try again in a moment.",
     "dailyLimit": "You've reached today's limit of {{limit}}. It resets at midnight.",

@@ -18,6 +18,7 @@ export function Loading() {
 // Access errors get the interface's own words; the API's text is meant for developers.
 const CODE_MESSAGES: Record<string, string> = {
   NETWORK_ERROR: 'app.offline',
+  INTERNAL_ERROR: 'app.serverError',
   UNAUTHENTICATED: 'access.signInAgain',
   FORBIDDEN: 'access.forbidden',
   OUT_OF_SCOPE: 'access.outOfScope',
