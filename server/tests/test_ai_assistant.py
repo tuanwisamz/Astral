@@ -12,7 +12,9 @@ QUESTION = {"message": "Which roads in Kinta first?"}
 
 def _call(call_id: str, name: str = "find_segments", args: dict | None = None) -> types.GenerateContentResponse:
     part = types.Part(function_call=types.FunctionCall(id=call_id, name=name, args=args or {"query": "FT1"}))
-    return types.GenerateContentResponse(candidates=[types.Candidate(content=types.Content(role="model", parts=[part]))])
+    return types.GenerateContentResponse(
+        candidates=[types.Candidate(content=types.Content(role="model", parts=[part]))]
+    )
 
 
 def _text(text: str) -> types.GenerateContentResponse:
@@ -47,12 +49,15 @@ def test_tool_reply_carries_the_call_id(api, monkeypatch):
     assert body["tool_calls"] == [{"tool": "find_segments", "args": {"query": "FT1"}}]
     tool_turn = fake.sent[1][-1]
     reply = tool_turn.parts[0].function_response
-    assert tool_turn.role == "tool" and (reply.id, reply.name) == ("call-1", "find_segments")
+    # The Gemini API rejects role "tool"; function responses must go back as a user turn.
+    assert tool_turn.role == "user" and (reply.id, reply.name) == ("call-1", "find_segments")
     assert reply.response["result"]["roads"]  # the real tool ran against the fixture network
 
 
 def test_a_failed_lookup_goes_back_to_the_model(api, monkeypatch):
-    fake = FakeClient([_call("c1", "get_segment_analysis", {"segment_id": 999999}), _text("I couldn't find that road.")])
+    fake = FakeClient(
+        [_call("c1", "get_segment_analysis", {"segment_id": 999999}), _text("I couldn't find that road.")]
+    )
     monkeypatch.setattr(gemini, "client", lambda: fake)
     res = api("officer", "A").post("/api/v1/ai/assistant", json=QUESTION)
     assert res.status_code == 200 and res.json()["answer"] == "I couldn't find that road."

@@ -24,7 +24,7 @@ export default function MyReports() {
   if (q.data.items.length === 0) {
     return (
       <div className="mx-auto max-w-2xl px-4">
-        <EmptyState title={t('placeholder.myReportsTitle')} body={t('placeholder.myReportsBody')}
+        <EmptyState title={t('myReports.emptyTitle')} body={t('myReports.emptyBody')}
           action={<Link to="/report" className={buttonClass('primary')}>{t('nav.report')}</Link>} />
       </div>
     )

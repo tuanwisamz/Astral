@@ -284,8 +284,13 @@ def test_address_label_is_short_and_ordered():
     from app.services.geocode import label
 
     raw = {
-        "address": {"road": "Jalan Tronoh", "suburb": "Seri Iskandar", "town": "Seri Iskandar", "postcode": "32610",
-                    "state": "Perak"},
+        "address": {
+            "road": "Jalan Tronoh",
+            "suburb": "Seri Iskandar",
+            "town": "Seri Iskandar",
+            "postcode": "32610",
+            "state": "Perak",
+        },
         "display_name": "a much longer name",
     }
     assert label(raw) == "Jalan Tronoh, Seri Iskandar, 32610, Perak"
@@ -305,7 +310,9 @@ def test_where_looks_up_the_address_once(api, monkeypatch):
     monkeypatch.setattr(geocode, "_fetch", fake_fetch)
     c = api("public")
     for _ in range(2):
-        assert c.get("/api/v1/reports/where", params=ON_FT1).json() == {"address": "Jalan Sultan Azlan Shah, Ipoh, Perak"}
+        assert c.get("/api/v1/reports/where", params=ON_FT1).json() == {
+            "address": "Jalan Sultan Azlan Shah, Ipoh, Perak"
+        }
     assert len(calls) == 1  # the second answer came from geocode_cache
 
 

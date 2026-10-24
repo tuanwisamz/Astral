@@ -669,5 +669,9 @@
       "public": "Pengguna",
       "dev": "Dev"
     }
+  },
+  "myReports": {
+    "emptyTitle": "Belum ada laporan",
+    "emptyBody": "Bahaya yang anda laporkan dipaparkan di sini, bersama kemajuan pembaikannya."
   }
 }

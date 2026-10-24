@@ -669,5 +669,9 @@
       "public": "User",
       "dev": "Dev"
     }
+  },
+  "myReports": {
+    "emptyTitle": "No reports yet",
+    "emptyBody": "Hazards you report appear here, with how far each repair has got."
   }
 }

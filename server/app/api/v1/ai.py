@@ -384,7 +384,8 @@ async def assistant(
                 cited |= _segment_ids(result)
                 calls_made.append({"tool": call.name, "args": args})
                 parts.append(_tool_reply(call, result))
-            contents.append(types.Content(role="tool", parts=parts))
+            # Function responses go back as a user turn: the Gemini API rejects role "tool".
+            contents.append(types.Content(role="user", parts=parts))
         else:
             answer = ""
     except (genai_errors.APIError, ApiError) as exc:

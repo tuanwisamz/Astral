@@ -29,7 +29,7 @@ export default function ReportStatus() {
 
   return (
     <div className="mx-auto max-w-lg px-4 py-8">
-      <p className="text-sm text-road">{t('tracking.reportRef')}</p>
+      <p className="text-sm text-road">{t('tracking.ref')}</p>
       <h1 className="font-condensed text-4xl font-semibold tabular">{r.ref_no}</h1>
       <p className="mt-2 flex flex-wrap items-center gap-2">
         <HazardLabel type={r.hazard_type} />

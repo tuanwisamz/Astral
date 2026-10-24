@@ -28,6 +28,7 @@ HORIZONS = (7, 30)
 NEG_KEEP = 0.10  # keep 10% of negatives, weighted ×10, so training stays a few hundred thousand rows
 HISTORY_DAYS = 365
 TEST_SHARE = 0.25
+MAX_PROBABILITY = 0.95  # calibrated probabilities stop short of certainty (see train_hazard)
 
 
 def log(msg: str) -> None:
@@ -171,7 +172,9 @@ def train_hazard(ctx: F.Context, hazard: str, rng: np.random.Generator, syntheti
         is_calib = tr & (ctx.days[rows.t.to_numpy()] >= calib_from)
         fit = tr & ~is_calib
         hgb.fit(X[fit], y[fit])
-        iso = IsotonicRegression(out_of_bounds="clip", y_min=0, y_max=1)
+        # Capped below 1: the top buckets are fitted on a handful of examples, and when they all
+        # happened to be positive, isotonic returns a certainty no model has ("100% risk").
+        iso = IsotonicRegression(out_of_bounds="clip", y_min=0, y_max=MAX_PROBABILITY)
         iso.fit(hgb.predict_proba(X[is_calib])[:, 1], y[is_calib], sample_weight=w[is_calib])
         model = Calibrated(hgb, iso)
         model_metrics = evaluate(y[te], model.predict_proba(X[te])[:, 1], w[te])

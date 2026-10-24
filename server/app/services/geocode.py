@@ -55,8 +55,14 @@ async def _fetch(lat: float, lng: float) -> dict | None:
         async with httpx.AsyncClient(timeout=8, headers={"User-Agent": get_settings().nominatim_user_agent}) as c:
             r = await c.get(
                 REVERSE,
-                params={"lat": lat, "lon": lng, "format": "jsonv2", "zoom": 18, "addressdetails": 1,
-                        "accept-language": "ms,en"},
+                params={
+                    "lat": lat,
+                    "lon": lng,
+                    "format": "jsonv2",
+                    "zoom": 18,
+                    "addressdetails": 1,
+                    "accept-language": "ms,en",
+                },
             )
     r.raise_for_status()
     raw = r.json()
